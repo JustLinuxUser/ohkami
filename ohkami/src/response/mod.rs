@@ -151,7 +151,7 @@ impl Response {
                     }
                     self.headers.write_unchecked_to(&mut buf);
                 }
-        
+
                 conn.write_all(&buf).await.expect("Failed to send response");
             }
 
@@ -172,7 +172,7 @@ impl Response {
                         crate::push_unchecked!(buf <- "\r\n");
                     }
                     self.headers.write_unchecked_to(&mut buf);
-                    crate::push_unchecked!(buf <- bytes);
+                    crate::push_unchecked!(buf <- content);
                 }
 
                 conn.write_all(&buf).await.expect("Failed to send response");
