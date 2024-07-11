@@ -159,7 +159,7 @@ impl<Inner: FangProc> FangProc for CORSProc<Inner> {
             /* override default `Not Implemented` response for valid preflight */
             if res.status == Status::NotImplemented {
                 res.status = Status::OK;
-                h.ContentType(None).ContentLength(None);
+                h.ContentType(None);//.ContentLength(None);
             }
         }
 

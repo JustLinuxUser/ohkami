@@ -273,7 +273,7 @@ trait RoutingItem {
                             {
                                 res.headers.set()
                                     .ContentType(this.mime)
-                                    .ContentLength(&*this.size_str);
+                                    ;//.ContentLength(&*this.size_str);
                                 res.content = Content::Payload({
                                     let content: &'static [u8] = &this.content;
                                     content.into()

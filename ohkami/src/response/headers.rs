@@ -191,7 +191,7 @@ macro_rules! Header {
             }
         }
     };
-} Header! {45;
+} Header! {43;
     AcceptRanges:                    b"Accept-Ranges",
     AccessControlAllowCredentials:   b"Access-Control-Allow-Credentials",
     AccessControlAllowHeaders:       b"Access-Control-Allow-Headers",
@@ -209,13 +209,13 @@ macro_rules! Header {
     ContentDisposition:              b"Content-Disposition",
     ContentEncoding:                 b"Content-Ecoding",
     ContentLanguage:                 b"Content-Language",
-    ContentLength:                   b"Content-Length",
+    /* ContentLength:                   b"Content-Length", */
     ContentLocation:                 b"Content-Location",
     ContentRange:                    b"Content-Range",
     ContentSecurityPolicy:           b"Content-Security-Policy",
     ContentSecurityPolicyReportOnly: b"Content-Security-Policy-Report-Only",
     ContentType:                     b"Content-Type",
-    Date:                            b"Date",
+    /* Date:                            b"Date", */
     ETag:                            b"ETag",
     Expires:                         b"Expires",
     Link:                            b"Link",

@@ -27,13 +27,30 @@ pub struct UTCDateTime {
         Self { date, time }
     }
 
-    pub fn into_imf_fixdate(self) -> String {
-        const IMF_FIXDATE_LEN: usize      = str::len("Sun, 06 Nov 1994 08:49:37 GMT");
+    pub const IMF_FIXDATE_LEN: usize = str::len("Sun, 06 Nov 1994 08:49:37 GMT");
+    pub const DATE_HEADER_LEN: usize = "Date: ".len() + Self::IMF_FIXDATE_LEN + "\r\n".len();
+
+    /// SAFETY: `buf` has at least `DATE_HEADER_LEN` ( = 37 ) remaining capacity
+    #[inline]
+    pub unsafe fn fmt_date_header_unchecked(self, buf: &mut Vec<u8>) {
+        {const PART: &[u8] = b"Date";
+            std::ptr::copy_nonoverlapping(PART.as_ptr(), buf.as_mut_ptr().add(buf.len()), PART.len());
+            buf.set_len(buf.len() + PART.len())
+        }
+        self.fmt_imf_fixdate_unchecked(buf);
+        {const PART: &[u8] = b"\r\n";
+            std::ptr::copy_nonoverlapping(PART.as_ptr(), buf.as_mut_ptr().add(buf.len()), PART.len());
+            buf.set_len(buf.len() + PART.len())
+        }
+    }
+
+    /// SAFETY: `buf` has at least `IMF_FIXDATE_LEN` ( = 29 ) remaining capacity
+    pub unsafe fn fmt_imf_fixdate_unchecked(self, buf: &mut Vec<u8>) {
         const SHORT_WEEKDAYS:  [&str; 7]  = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const SHORT_MONTHS:    [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
         #[inline(always)]
-        fn push_hundreds(buf: &mut String, n: u8) {
+        fn push_hundreds(buf: &mut Vec<u8>, n: u8) {
             #[cfg(debug_assertions)] assert! {
                 n < 100, "Called `push_hundreds` for `n` that's 100 or greater"
             }
@@ -42,64 +59,68 @@ pub struct UTCDateTime {
                 let (len, ptr) = (buf.len(), buf.as_mut_ptr());
                 std::ptr::write(ptr.add(len), n/10 + b'0');
                 std::ptr::write(ptr.add(len + 1), n%10 + b'0');
-                buf.as_mut_vec().set_len(len + 2)
+                buf.set_len(len + 2)
             }
         }
 
-        let mut buf = String::with_capacity(IMF_FIXDATE_LEN);
-        {
-            let Self { date, time } = self;
+        let Self { date, time } = self;
 
-            macro_rules! push_unchecked {
-                ($s:expr) => {
-                    unsafe {
-                        let (buf_len, s_len) = (buf.len(), $s.len());
-                        std::ptr::copy_nonoverlapping(
-                            $s.as_ptr(),
-                            buf.as_mut_ptr().add(buf_len),
-                            s_len
-                        );
-                        buf.as_mut_vec().set_len(buf_len + s_len);
-                    }
-                };
-                (@ $s:expr) => {
-                    unsafe {
-                        let buf_len = buf.len();
-                        std::ptr::write(buf.as_mut_ptr().add(buf_len), $s);
-                        buf.as_mut_vec().set_len(buf_len + 1);
-                    }
-                };
-            }
+        macro_rules! push_unchecked {
+            ($s:expr) => {
+                unsafe {
+                    let (buf_len, s_len) = (buf.len(), $s.len());
+                    std::ptr::copy_nonoverlapping(
+                        $s.as_ptr(),
+                        buf.as_mut_ptr().add(buf_len),
+                        s_len
+                    );
+                    buf.set_len(buf_len + s_len);
+                }
+            };
+            (@ $s:expr) => {
+                unsafe {
+                    let buf_len = buf.len();
+                    std::ptr::write(buf.as_mut_ptr().add(buf_len), $s);
+                    buf.set_len(buf_len + 1);
+                }
+            };
+        }
 
-            push_unchecked!(SHORT_WEEKDAYS.get_unchecked(date.weekday().num_days_from_sunday() as usize));
-            push_unchecked!(", ");
+        push_unchecked!(SHORT_WEEKDAYS.get_unchecked(date.weekday().num_days_from_sunday() as usize));
+        push_unchecked!(", ");
 
-            let day = date.day() as u8;
-            if day < 10 {
-                push_unchecked!(@ b'0');
-                push_unchecked!(@ day + b'0');
-            } else {
-                push_hundreds(&mut buf, day);
-            }
+        let day = date.day() as u8;
+        if day < 10 {
+            push_unchecked!(@ b'0');
+            push_unchecked!(@ day + b'0');
+        } else {
+            push_hundreds(buf, day);
+        }
 
-            push_unchecked!(@ b' ');
-            push_unchecked!(SHORT_MONTHS.get_unchecked(date.month_index() as usize));
+        push_unchecked!(@ b' ');
+        push_unchecked!(SHORT_MONTHS.get_unchecked(date.month_index() as usize));
 
-            push_unchecked!(@ b' ');
-            let year = date.year();
-            push_hundreds(&mut buf, (year / 100) as u8);
-            push_hundreds(&mut buf, (year % 100) as u8);
+        push_unchecked!(@ b' ');
+        let year = date.year();
+        push_hundreds(buf, (year / 100) as u8);
+        push_hundreds(buf, (year % 100) as u8);
 
-            push_unchecked!(@ b' ');
-            let (hour, min, sec) = time.hms();
-            push_hundreds(&mut buf, hour as u8);
-            push_unchecked!(@ b':');
-            push_hundreds(&mut buf, min as u8);
-            push_unchecked!(@ b':');
-            let sec = sec + time.nanosecond() / 1_000_000_000;
-            push_hundreds(&mut buf, sec as u8);
-            
-            push_unchecked!(" GMT");
+        push_unchecked!(@ b' ');
+        let (hour, min, sec) = time.hms();
+        push_hundreds(buf, hour as u8);
+        push_unchecked!(@ b':');
+        push_hundreds(buf, min as u8);
+        push_unchecked!(@ b':');
+        let sec = sec + time.nanosecond() / 1_000_000_000;
+        push_hundreds(buf, sec as u8);
+        
+        push_unchecked!(" GMT");
+    }
+
+    pub fn into_imf_fixdate(self) -> String {
+        let mut buf = String::with_capacity(Self::IMF_FIXDATE_LEN);
+        unsafe {// SAFETY: enough capacity
+            self.fmt_imf_fixdate_unchecked(buf.as_mut_vec())
         }
         buf
     }

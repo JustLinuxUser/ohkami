@@ -88,6 +88,7 @@ use crate::utils::StreamExt;
 ///     Ok("Hello, Response!".into())
 /// }
 /// ```
+#[derive(Debug, PartialEq)]
 pub struct Response {
     /// HTTP status of this response
     pub status: Status,
@@ -120,46 +121,60 @@ impl Response {
         }
     }
 
-    /// Complete HTTP spec
-    #[inline(always)]
-    pub(crate) fn complete(&mut self) {
-        self.headers.set().Date(::ohkami_lib::imf_fixdate(
-            std::time::Duration::from_secs(crate::utils::unix_timestamp())
-        ));
-
-        match &self.content {
-            Content::None => {
-                match self.status {
-                    Status::NoContent => self.headers.set()
-                        .ContentLength(None),
-                    _ => self.headers.set()
-                        .ContentLength("0")
-                }
-            }
-
-            Content::Payload(bytes) => self.headers.set()
-                .ContentLength(ohkami_lib::num::itoa(bytes.len())),
-
-            #[cfg(feature="sse")]
-            Content::Stream(_) => self.headers.set()
-                .ContentLength(None)
-        };
-    }
+//    /// Complete HTTP spec
+//    #[inline(always)]
+//    pub(crate) fn complete(&mut self) {
+//        self.headers.set().Date(::ohkami_lib::imf_fixdate(
+//            std::time::Duration::from_secs(crate::utils::unix_timestamp())
+//        ));
+//
+//        match &self.content {
+//            Content::None => {
+//                match self.status {
+//                    Status::NoContent => self.headers.set()
+//                        .ContentLength(None),
+//                    _ => self.headers.set()
+//                        .ContentLength("0")
+//                }
+//            }
+//
+//            Content::Payload(bytes) => self.headers.set()
+//                .ContentLength(ohkami_lib::num::itoa(bytes.len())),
+//
+//            #[cfg(feature="sse")]
+//            Content::Stream(_) => self.headers.set()
+//                .ContentLength(None)
+//        };
+//    }
 }
 
 #[cfg(any(feature="rt_tokio",feature="rt_async-std"))]
 impl Response {
     #[cfg_attr(not(feature="sse"), inline)]
-    pub(crate) async fn send(mut self, conn: &mut (impl AsyncWriter + Unpin)) {
-        self.complete();
+    pub(crate) async fn send(self, conn: &mut (impl AsyncWriter + Unpin)) {
+        use ohkami_lib::time::UTCDateTime;
+
+        //self.complete();
+        let now = UTCDateTime::from_duration_since_unix_epoch(
+            std::time::Duration::from_secs(crate::utils::unix_timestamp())
+        );
 
         match self.content {
             Content::None => {
+                let content_length = match self.status {
+                    Status::NoContent => "",
+                    _ => "Content-Length: 0\r\n"
+                };
+
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
+                    content_length.len() +
+                    UTCDateTime::DATE_HEADER_LEN +
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
+                    crate::push_unchecked!(buf <- content_length);
+                    now.fmt_date_header_unchecked(&mut buf);
                     self.headers.write_unchecked_to(&mut buf);
                 }
         
@@ -167,12 +182,18 @@ impl Response {
             }
 
             Content::Payload(bytes) => {
+                let content = &*bytes;
+                let content_len = content.len();
+
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
-                    self.headers.size +
-                    bytes.len()
+                    const {"Content-Length: ".len() + 1+usize::MAX.ilog10() as _ + "\r\n".len()} +
+                    UTCDateTime::DATE_HEADER_LEN +
+                    self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
+                    ()
+                    now.fmt_date_header_unchecked(&mut buf);
                     self.headers.write_unchecked_to(&mut buf);
                     crate::push_unchecked!(buf <- bytes);
                 }
@@ -243,7 +264,7 @@ impl Response {
         let old_content = self.content.take();
         self.headers.set()
             .ContentType(None)
-            .ContentLength(None);
+            ;//.ContentLength(None);
         old_content
     }
     pub fn without_content(mut self) -> Self {
@@ -258,7 +279,7 @@ impl Response {
         let content = content.into();
         self.headers.set()
             .ContentType(content_type)
-            .ContentLength(content.len().to_string());
+            ;//.ContentLength(content.len().to_string());
         self.content = Content::Payload(content.into());
     }
     pub fn with_payload(mut self,
@@ -368,48 +389,6 @@ impl Response {
     }
 }
 
-const _: () = {
-    impl std::fmt::Debug for Response {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let mut this = Self {
-                status:  self.status,
-                headers: self.headers.clone(),
-                content: match &self.content {
-                    Content::None           => Content::None,
-
-                    Content::Payload(bytes) => Content::Payload(bytes.clone()),
-                    
-                    #[cfg(feature="sse")]
-                    Content::Stream(_)      => Content::Stream(Box::pin({
-                        struct DummyStream;
-                        impl ohkami_lib::Stream for DummyStream {
-                            type Item = Result<String, String>;
-                            fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
-                                unreachable!()
-                            }
-                        }
-                        DummyStream
-                    }))
-                }
-            };
-            this.complete();
-
-            f.debug_struct("Response")
-                .field("status",  &this.status)
-                .field("headers", &this.headers)
-                .field("content", &this.content)
-                .finish()
-        }
-    }
-
-    impl PartialEq for Response {
-        fn eq(&self, other: &Self) -> bool {
-            self.status  == other.status  &&
-            self.headers == other.headers &&
-            self.content == other.content
-        }
-    }
-};
 
 #[cfg(feature="nightly")]
 const _: () = {
