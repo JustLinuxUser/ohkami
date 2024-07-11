@@ -3,6 +3,24 @@ use std::borrow::Cow;
 use rustc_hash::FxHashMap;
 
 
+/*
+
+## Avoid allocate `Date`, `Content-Length` as `String`
+
+* `Response::write_to` のときにバイト列に直接書き込むようにする
+* そもそも、Content-Length や Date は framework 利用者が勝手に
+  設定 ( 変更 ) できないようになっているほうがよい
+* これらを `standard` に入れず特別扱いする
+  ( 既に Set-Cookie を特別扱いしているので抵抗ない )
+* `.ContentLength()`, `.Date()` getter だけ生やして、あとは
+  Debug のときだけ ( = `.iter()` でだけ ) String を作る
+* 逆に他の header については、&'static str 以外は String として
+  allocate するコストを支払っても、値を field として保持して
+  `.{Name}() -> &str` で取得したり `.set().〜` で変更できる
+  インターフェースが直感的で good
+
+*/
+
 #[derive(Clone)]
 pub struct Headers {
     standard:  IndexMap<N_SERVER_HEADERS, Cow<'static, str>>,
