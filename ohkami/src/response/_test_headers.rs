@@ -15,15 +15,14 @@ use super::ResponseHeaders;
 
     let mut h = ResponseHeaders::new();
     h.set().Server("A").ContentType("application/json");
-    h.set().Server("B");//.ContentLength("100");
-    h.set().ContentType("text/html");//.ContentLength("42");
+    h.set().Server("B");
+    h.set().ContentType("text/html");
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
         assert_eq!(std::str::from_utf8(&buf).unwrap(), "\
             Server: B\r\n\
             Content-Type: text/html\r\n\
-            Content-Length: 42\r\n\
             \r\n\
         ");
     }

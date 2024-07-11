@@ -327,8 +327,7 @@ impl Ohkami {
                 let router = router.into_radix();
                 #[cfg(feature="DEBUG")] ::worker::console_debug!("Done `TrieRouter::into_radix` (without compressions)");
                 
-                let mut res = router.handle(&mut ohkami_req).await;
-                res.complete();
+                let res = router.handle(&mut ohkami_req).await;
                 res
             }
             Err(e) => {#[cfg(feature="DEBUG")] ::worker::console_debug!("`take_over` returned an error response: {e:?}");

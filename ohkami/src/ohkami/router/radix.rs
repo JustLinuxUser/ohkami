@@ -100,10 +100,8 @@ impl RadixRouter {
             Method::OPTIONS => &self.OPTIONS,
             Method::HEAD => {
                 let mut res = self.GET.search(&mut req.path).call_bite(req).await;
-                {/* almost `res.drop_content()` but leave `Content-Type` */
-                    res.headers.set();//.ContentLength(None);
-                    res.content = crate::response::Content::None;
-                }
+                /* almost `res.drop_content()` but leave `Content-Type` */
+                res.content = crate::response::Content::None;
                 return res
             }
         }).search(&mut req.path).call_bite(req).await

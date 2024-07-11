@@ -33,7 +33,7 @@ pub struct UTCDateTime {
     /// SAFETY: `buf` has at least `DATE_HEADER_LEN` ( = 37 ) remaining capacity
     #[inline]
     pub unsafe fn fmt_date_header_unchecked(self, buf: &mut Vec<u8>) {
-        {const PART: &[u8] = b"Date";
+        {const PART: &[u8] = b"Date: ";
             std::ptr::copy_nonoverlapping(PART.as_ptr(), buf.as_mut_ptr().add(buf.len()), PART.len());
             buf.set_len(buf.len() + PART.len())
         }

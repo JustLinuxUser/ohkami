@@ -109,8 +109,7 @@ pub trait Payload: Sized {
             Err(err)  => Err(err),
             Ok(bytes) => Ok({
                 res.headers.set()
-                    .ContentType(<Self::Type>::CONTENT_TYPE)
-                    ;//.ContentLength(bytes.len().to_string());
+                    .ContentType(<Self::Type>::CONTENT_TYPE);
                 res.content = Content::Payload(bytes.into());
             }),
         }

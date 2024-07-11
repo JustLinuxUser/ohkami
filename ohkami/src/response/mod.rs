@@ -120,32 +120,6 @@ impl Response {
             content: Content::None,
         }
     }
-
-//    /// Complete HTTP spec
-//    #[inline(always)]
-//    pub(crate) fn complete(&mut self) {
-//        self.headers.set().Date(::ohkami_lib::imf_fixdate(
-//            std::time::Duration::from_secs(crate::utils::unix_timestamp())
-//        ));
-//
-//        match &self.content {
-//            Content::None => {
-//                match self.status {
-//                    Status::NoContent => self.headers.set()
-//                        .ContentLength(None),
-//                    _ => self.headers.set()
-//                        .ContentLength("0")
-//                }
-//            }
-//
-//            Content::Payload(bytes) => self.headers.set()
-//                .ContentLength(ohkami_lib::num::itoa(bytes.len())),
-//
-//            #[cfg(feature="sse")]
-//            Content::Stream(_) => self.headers.set()
-//                .ContentLength(None)
-//        };
-//    }
 }
 
 #[cfg(any(feature="rt_tokio",feature="rt_async-std"))]
@@ -154,27 +128,27 @@ impl Response {
     pub(crate) async fn send(self, conn: &mut (impl AsyncWriter + Unpin)) {
         use ohkami_lib::time::UTCDateTime;
 
-        //self.complete();
         let now = UTCDateTime::from_duration_since_unix_epoch(
             std::time::Duration::from_secs(crate::utils::unix_timestamp())
         );
 
         match self.content {
             Content::None => {
-                let content_length = match self.status {
-                    Status::NoContent => "",
-                    _ => "Content-Length: 0\r\n"
-                };
+                let content_length = (self.status != Status::NoContent).then_some(
+                    "Content-Length: 0\r\n"
+                );
 
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
-                    content_length.len() +
                     UTCDateTime::DATE_HEADER_LEN +
+                    content_length.map(str::len).unwrap_or(0) +
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    crate::push_unchecked!(buf <- content_length);
                     now.fmt_date_header_unchecked(&mut buf);
+                    if let Some(content_length) = content_length {
+                        crate::push_unchecked!(buf <- content_length);
+                    }
                     self.headers.write_unchecked_to(&mut buf);
                 }
         
@@ -183,17 +157,20 @@ impl Response {
 
             Content::Payload(bytes) => {
                 let content = &*bytes;
-                let content_len = content.len();
 
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
-                    const {"Content-Length: ".len() + 1+usize::MAX.ilog10() as _ + "\r\n".len()} +
                     UTCDateTime::DATE_HEADER_LEN +
+                    const {"Content-Length: ".len() + 1+usize::MAX.ilog10() as usize + "\r\n".len()} +
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    ()
                     now.fmt_date_header_unchecked(&mut buf);
+                    {
+                        crate::push_unchecked!(buf <- "Content-Length: ");
+                        ohkami_lib::num::encode_itoa_unchecked(content.len(), &mut buf);
+                        crate::push_unchecked!(buf <- "\r\n");
+                    }
                     self.headers.write_unchecked_to(&mut buf);
                     crate::push_unchecked!(buf <- bytes);
                 }
@@ -205,9 +182,11 @@ impl Response {
             Content::Stream(mut stream) => {
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
+                    UTCDateTime::DATE_HEADER_LEN +
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
+                    now.fmt_date_header_unchecked(&mut buf);
                     self.headers.write_unchecked_to(&mut buf);
                 }
         
@@ -262,9 +241,7 @@ impl Response {
 
     pub fn drop_content(&mut self) -> Content {
         let old_content = self.content.take();
-        self.headers.set()
-            .ContentType(None)
-            ;//.ContentLength(None);
+        self.headers.set().ContentType(None);
         old_content
     }
     pub fn without_content(mut self) -> Self {
@@ -277,9 +254,7 @@ impl Response {
         content:      impl Into<Cow<'static, [u8]>>,
     ) {
         let content = content.into();
-        self.headers.set()
-            .ContentType(content_type)
-            ;//.ContentLength(content.len().to_string());
+        self.headers.set().ContentType(content_type);
         self.content = Content::Payload(content.into());
     }
     pub fn with_payload(mut self,
@@ -296,8 +271,7 @@ impl Response {
     #[inline] pub fn set_text<Text: Into<Cow<'static, str>>>(&mut self, text: Text) {
         let body = text.into();
 
-        self.headers.set()
-            .ContentType("text/plain; charset=UTF-8");
+        self.headers.set().ContentType("text/plain; charset=UTF-8");
         self.content = Content::Payload(match body {
             Cow::Borrowed(str) => CowSlice::Ref(Slice::from_bytes(str.as_bytes())),
             Cow::Owned(string) => CowSlice::Own(string.into_bytes().into()),
@@ -312,8 +286,7 @@ impl Response {
     pub fn set_html<HTML: Into<Cow<'static, str>>>(&mut self, html: HTML) {
         let body = html.into();
 
-        self.headers.set()
-            .ContentType("text/html; charset=UTF-8");
+        self.headers.set().ContentType("text/html; charset=UTF-8");
         self.content = Content::Payload(match body {
             Cow::Borrowed(str) => CowSlice::Ref(Slice::from_bytes(str.as_bytes())),
             Cow::Owned(string) => CowSlice::Own(string.into_bytes().into()),
@@ -329,8 +302,7 @@ impl Response {
     pub fn set_json<JSON: serde::Serialize>(&mut self, json: JSON) {
         let body = ::serde_json::to_vec(&json).unwrap();
 
-        self.headers.set()
-            .ContentType("application/json");
+        self.headers.set().ContentType("application/json");
         self.content = Content::Payload(body.into());
     }
     #[inline(always)]
@@ -346,8 +318,7 @@ impl Response {
             Cow::Owned(string) => Cow::Owned(string.into_bytes()),
         };
 
-        self.headers.set()
-            .ContentType("application/json");
+        self.headers.set().ContentType("application/json");
         self.content = Content::Payload(body.into());
     }
     /// SAFETY: Argument `json_lit` is **valid JSON**
