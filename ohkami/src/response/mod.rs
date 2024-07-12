@@ -125,52 +125,33 @@ impl Response {
 #[cfg(any(feature="rt_tokio",feature="rt_async-std"))]
 impl Response {
     #[cfg_attr(not(feature="sse"), inline)]
-    pub(crate) async fn send(self, conn: &mut (impl AsyncWriter + Unpin)) {
-        use ohkami_lib::time::UTCDateTime;
-
-        let now = UTCDateTime::from_duration_since_unix_epoch(
-            std::time::Duration::from_secs(crate::utils::unix_timestamp())
-        );
-
+    pub(crate) async fn send(mut self, conn: &mut (impl AsyncWriter + Unpin)) {
         match self.content {
             Content::None => {
-                let content_length = (self.status != Status::NoContent).then_some(
-                    "Content-Length: 0\r\n"
-                );
+                if !matches!(self.status, Status::NoContent) {
+                    self.headers.set().ContentLength(0);
+                }
 
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
-                    UTCDateTime::DATE_HEADER_LEN +
-                    content_length.map(str::len).unwrap_or(0) +
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    now.fmt_date_header_unchecked(&mut buf);
-                    if let Some(content_length) = content_length {
-                        crate::push_unchecked!(buf <- content_length);
-                    }
                     self.headers.write_unchecked_to(&mut buf);
                 }
 
                 conn.write_all(&buf).await.expect("Failed to send response");
             }
 
-            Content::Payload(bytes) => {
-                let content = &*bytes;
+            Content::Payload(bytes) => {let content = &*bytes;
+                self.headers.set().ContentLength(content.len());
 
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
-                    UTCDateTime::DATE_HEADER_LEN +
-                    const {"Content-Length: ".len() + 1+usize::MAX.ilog10() as usize + "\r\n".len()} +
-                    self.headers.size
+                    self.headers.size +
+                    content.len()
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    now.fmt_date_header_unchecked(&mut buf);
-                    {
-                        crate::push_unchecked!(buf <- "Content-Length: ");
-                        ohkami_lib::num::encode_itoa_unchecked(content.len(), &mut buf);
-                        crate::push_unchecked!(buf <- "\r\n");
-                    }
                     self.headers.write_unchecked_to(&mut buf);
                     crate::push_unchecked!(buf <- content);
                 }
@@ -182,11 +163,9 @@ impl Response {
             Content::Stream(mut stream) => {
                 let mut buf = Vec::<u8>::with_capacity(
                     self.status.line().len() +
-                    UTCDateTime::DATE_HEADER_LEN +
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    now.fmt_date_header_unchecked(&mut buf);
                     self.headers.write_unchecked_to(&mut buf);
                 }
         

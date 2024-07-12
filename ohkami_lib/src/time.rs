@@ -10,6 +10,7 @@ use std::time::Duration;
     UTCDateTime::from_duration_since_unix_epoch(duration_since_unix_epoch).into_imf_fixdate()
 }
 
+#[derive(Clone, Copy)]
 pub struct UTCDateTime {
     date: Date,
     time: Time,
@@ -127,7 +128,7 @@ pub struct UTCDateTime {
 }
 
 /// (year << 13) | of
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Date(i32);
 impl Date {
     fn from_days(days: i32) -> Self {
@@ -205,7 +206,7 @@ impl Date {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Time {
     secs: u32,
     frac: u32,

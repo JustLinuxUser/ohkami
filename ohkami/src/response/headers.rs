@@ -1,13 +1,16 @@
 use crate::header::{IndexMap, Append, SetCookie, SetCookieBuilder};
+use ohkami_lib::time::UTCDateTime;
 use std::borrow::Cow;
 use rustc_hash::FxHashMap;
 
 
 #[derive(Clone)]
 pub struct Headers {
-    standard:  IndexMap<N_SERVER_HEADERS, Cow<'static, str>>,
-    custom:    Option<Box<FxHashMap<&'static str, Cow<'static, str>>>>,
-    setcookie: Option<Box<Vec<Cow<'static, str>>>>,
+    date:           UTCDateTime,
+    content_length: Option<usize>,
+    standard:       IndexMap<N_SERVER_HEADERS, Cow<'static, str>>,
+    custom:         Option<Box<FxHashMap<&'static str, Cow<'static, str>>>>,
+    setcookie:      Option<Box<Vec<Cow<'static, str>>>>,
     pub(crate) size: usize,
 }
 
@@ -239,8 +242,18 @@ const _: () = {
         }
     }
 
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, unused)]
     impl<'s> SetHeaders<'s> {
+        #[inline(always)]
+        pub(crate) fn ContentLength(self, length: usize) -> Self {
+            self.0.content_length = Some(length);
+            self.0.size +=
+                "Content-Length: ".len() +
+                length.checked_ilog10().unwrap_or(1) as usize +
+                "\r\n".len();
+            self
+        }
+
         /// Add new `Set-Cookie` header in the response.
         /// 
         /// - When you call this N times, the response has N different
@@ -402,10 +415,12 @@ impl Headers {
     #[inline]
     pub(crate) fn new() -> Self {
         Self {
-            standard:  IndexMap::new(),
-            custom:    None,
-            setcookie: None,
-            size:      "\r\n".len(),
+            date:           UTCDateTime::from_duration_since_unix_epoch(std::time::Duration::from_secs(crate::utils::unix_timestamp())),
+            content_length: None,
+            standard:       IndexMap::new(),
+            custom:         None,
+            setcookie:      None,
+            size:           UTCDateTime::DATE_HEADER_LEN + "\r\n".len()
         }
     }
     #[cfg(feature="DEBUG")]
@@ -439,6 +454,12 @@ impl Headers {
     ))]
     /// SAFETY: `buf` has remaining capacity of at least `self.size`
     pub(crate) unsafe fn write_unchecked_to(&self, buf: &mut Vec<u8>) {
+        self.date.fmt_date_header_unchecked(buf);
+        if let Some(content_length) = self.content_length {
+            crate::push_unchecked!(buf <- "Content-Length: ");
+            ohkami_lib::num::encode_itoa_unchecked(content_length, buf);
+            crate::push_unchecked!(buf <- "\r\n");
+        }
         for (i, v) in self.standard.iter() {
             let h = std::mem::transmute::<_, Header>(*i as u8); {
                 crate::push_unchecked!(buf <- h.as_bytes());
@@ -475,9 +496,13 @@ impl Headers {
 const _: () = {
     impl std::fmt::Debug for Headers {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_map()
-                .entries(self.iter())
-                .finish()
+            let mut dmap = f.debug_map();
+            dmap.entry(&"Date", &self.date.into_imf_fixdate())
+                .entries(self.iter());
+            if let Some(content_length) = self.content_length {
+                dmap.entry(&"Content-Length", &content_length);
+            }
+            dmap.finish()
         }
     }
 

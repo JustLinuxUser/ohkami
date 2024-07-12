@@ -2,15 +2,24 @@
 
 use crate::header::{append, SameSitePolicy, SetCookie};
 use super::ResponseHeaders;
+use ohkami_lib::time::UTCDateTime;
 
 
 #[test] fn insert_and_write() {
+    let __now__ = UTCDateTime::from_duration_since_unix_epoch(
+        std::time::Duration::from_secs(crate::utils::unix_timestamp())
+    ).into_imf_fixdate();
+
     let mut h = ResponseHeaders::new();
     h.set().Server("A");
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "Server: A\r\n\r\n");
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), format!("\
+            Date: {__now__}\r\n\
+            Server: A\r\n\
+            \r\n\
+        "));
     }
 
     let mut h = ResponseHeaders::new();
@@ -20,15 +29,20 @@ use super::ResponseHeaders;
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "\
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), format!("\
+            Date: {__now__}\r\n\
             Server: B\r\n\
             Content-Type: text/html\r\n\
             \r\n\
-        ");
+        "));
     }
 }
 
 #[test] fn append_header() {
+    let __now__ = UTCDateTime::from_duration_since_unix_epoch(
+        std::time::Duration::from_secs(crate::utils::unix_timestamp())
+    ).into_imf_fixdate();
+
     let mut h = ResponseHeaders::new();
 
     h.set().Server(append("X"));
@@ -36,10 +50,11 @@ use super::ResponseHeaders;
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "\
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), format!("\
+            Date: {__now__}\r\n\
             Server: X\r\n\
             \r\n\
-        ");
+        "));
     }
 
     h.set().Server(append("Y"));
@@ -47,14 +62,19 @@ use super::ResponseHeaders;
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "\
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), format!("\
+            Date: {__now__}\r\n\
             Server: X, Y\r\n\
             \r\n\
-        ");
+        "));
     }
 }
 
 #[test] fn append_custom_header() {
+    let __now__ = UTCDateTime::from_duration_since_unix_epoch(
+        std::time::Duration::from_secs(crate::utils::unix_timestamp())
+    ).into_imf_fixdate();
+
     let mut h = ResponseHeaders::new();
 
     h.set().custom("Custom-Header", append("A"));
@@ -62,10 +82,11 @@ use super::ResponseHeaders;
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "\
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), format!("\
+            Date: {__now__}\r\n\
             Custom-Header: A\r\n\
             \r\n\
-        ");
+        "));
     }
 
     h.set().custom("Custom-Header", append("B"));
@@ -73,10 +94,11 @@ use super::ResponseHeaders;
     {
         let mut buf = Vec::new();
         h._write_to(&mut buf);
-        assert_eq!(std::str::from_utf8(&buf).unwrap(), "\
+        assert_eq!(std::str::from_utf8(&buf).unwrap(), format!("\
+            Date: {__now__}\r\n\
             Custom-Header: A, B\r\n\
             \r\n\
-        ");
+        "));
     }
 }
 
