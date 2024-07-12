@@ -8,9 +8,9 @@ use rustc_hash::FxHashMap;
 pub struct Headers {
     date:           UTCDateTime,
     content_length: Option<usize>,
+    setcookie:      Option<Box<Vec<Cow<'static, str>>>>,
     standard:       IndexMap<N_SERVER_HEADERS, Cow<'static, str>>,
     custom:         Option<Box<FxHashMap<&'static str, Cow<'static, str>>>>,
-    setcookie:      Option<Box<Vec<Cow<'static, str>>>>,
     pub(crate) size: usize,
 }
 
@@ -213,6 +213,7 @@ macro_rules! Header {
     SecWebSocketProtocol:            b"Sec-WebSocket-Protocol",
     SecWebSocketVersion:             b"Sec-WebSocket-Version",
     Server:                          b"Server",
+    /* SetCookie:                       b"Set-Cookie", */
     StrictTransportSecurity:         b"Strict-Transport-Security",
     Trailer:                         b"Trailer",
     TransferEncoding:                b"Transfer-Encoding",
@@ -427,27 +428,6 @@ impl Headers {
     #[doc(hidden)]
     pub fn _new() -> Self {Self::new()}
 
-    pub(crate) fn iter_standard(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.standard.iter()
-            .map(|(i, v)| (
-                unsafe {std::mem::transmute::<_, Header>(*i as u8)}.as_str(),
-                &**v
-            ))
-    }
-
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.iter_standard()
-            .chain(self.custom.as_ref()
-                .into_iter()
-                .flat_map(|hm| hm.iter().map(|(k, v)| (*k, &**v)))
-            )
-            .chain(self.setcookie.as_ref()
-                .map(|sc| sc.iter().map(Cow::as_ref)).into_iter()
-                .flatten()
-                .map(|sc| ("Set-Cookie", sc))
-            )
-    }
-
     #[cfg(any(
         feature="rt_tokio",feature="rt_async-std",
         feature="DEBUG"
@@ -496,13 +476,7 @@ impl Headers {
 const _: () = {
     impl std::fmt::Debug for Headers {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let mut dmap = f.debug_map();
-            dmap.entry(&"Date", &self.date.into_imf_fixdate())
-                .entries(self.iter());
-            if let Some(content_length) = self.content_length {
-                dmap.entry(&"Content-Length", &content_length);
-            }
-            dmap.finish()
+            f.debug_map().entries(self.iter()).finish()
         }
     }
 
@@ -523,6 +497,29 @@ const _: () = {
     }
 
     impl Headers {
+        pub(crate) fn iter_standard(&self) -> impl Iterator<Item = (&str, &str)> {
+            self.standard.iter()
+                .map(|(i, v)| (
+                    unsafe {std::mem::transmute::<_, Header>(*i as u8)}.as_str(),
+                    &**v
+                ))
+        }
+    
+        pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, Cow<'_, str>)> {
+            Some(("Date", self.date.into_imf_fixdate().into())).into_iter()
+                .chain(self.content_length.map(|cl| ("Content-Length", cl.to_string().into())))
+                .chain(self.iter_standard().map(|(k, v)| (k, Cow::Borrowed(v))))
+                .chain(self.custom.as_ref()
+                    .into_iter()
+                    .flat_map(|hm| hm.iter().map(|(k, v)| (*k, Cow::Borrowed(&**v))))
+                )
+                .chain(self.setcookie.as_ref()
+                    .map(|sc| sc.iter().map(Cow::as_ref)).into_iter()
+                    .flatten()
+                    .map(|sc| ("Set-Cookie", Cow::Borrowed(sc)))
+                )
+        }
+    
         pub fn from_iter(iter: impl IntoIterator<Item = (
             &'static str,
             impl Into<Cow<'static, str>>)>
@@ -546,7 +543,7 @@ const _: () = {
         fn into(self) -> ::worker::Headers {
             let mut h = ::worker::Headers::new();
             for (k, v) in self.iter() {
-                if let Err(_e) = h.append(k, v) {
+                if let Err(_e) = h.append(k, &*v) {
                     #[cfg(feature="DEBUG")] println!("`worker::Headers::append` failed: {_e:?}");
                 }
             }
