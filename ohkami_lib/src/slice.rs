@@ -57,6 +57,27 @@ const _: () = {
             std::hash::Hash::hash(unsafe {self.as_bytes()}, state)
         }
     }
+
+    impl std::ops::Deref for Slice {
+        type Target = [u8];
+        #[inline(always)]
+        fn deref(&self) -> &Self::Target {
+            unsafe {self.as_bytes()}
+        }
+    }
+
+    impl From<&'static [u8]> for Slice {
+        #[inline(always)]
+        fn from(b: &'static [u8]) -> Self {
+            Self::from_bytes(b)
+        }
+    }
+    impl From<&'static str> for Slice {
+        #[inline(always)]
+        fn from(s: &'static str) -> Self {
+            Self::from_bytes(s.as_bytes())
+        }
+    }
 };
 
 

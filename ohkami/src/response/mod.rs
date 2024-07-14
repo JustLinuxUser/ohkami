@@ -123,7 +123,7 @@ impl Response {
     /// Complete HTTP spec
     #[inline(always)]
     pub(crate) fn complete(&mut self) {
-        self.headers.set().Date(::ohkami_lib::imf_fixdate(
+        self.headers.set().Date(ohkami_lib::time::UTCDateTime::from_duration_since_unix_epoch(
             std::time::Duration::from_secs(crate::utils::unix_timestamp())
         ));
 
@@ -138,7 +138,7 @@ impl Response {
             }
 
             Content::Payload(bytes) => self.headers.set()
-                .ContentLength(ohkami_lib::num::itoa(bytes.len())),
+                .ContentLength(bytes.len()),
 
             #[cfg(feature="sse")]
             Content::Stream(_) => self.headers.set()
