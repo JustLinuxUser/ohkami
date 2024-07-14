@@ -9,6 +9,6 @@ use ohkami::utils::unix_timestamp;
     b.iter(|| {
         UTCDateTime::from_duration_since_unix_epoch(
             std::time::Duration::from_secs(unix_timestamp())
-        ).into_imf_fixdate();
+        ).to_imf_fixdate();
     })
 }
