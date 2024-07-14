@@ -16,7 +16,7 @@ impl Value {
             Self::String(s) => s.len(),
             Self::Slice(s) => s.len(),
             Self::Time(_) => UTCDateTime::IMF_FIXDATE_LEN,
-            Self::Int(i) => if *i < 1<<10 {4} else {const {1 + usize::MAX.ilog10() as usize}}
+            Self::Int(i) => if *i < 1<<9 {3} else {const {1 + usize::MAX.ilog10() as usize}}
         }
     }
 
