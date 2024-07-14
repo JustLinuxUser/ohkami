@@ -193,6 +193,11 @@ pub unsafe fn encode_itoa_unchecked(n: usize, buf: &mut Vec<u8>) {
         usize::MAX - 1,
         usize::MAX,
     ] {
-        assert_eq!(itoa(n), n.to_string())
+        assert_eq!(itoa(n), n.to_string());
+        assert_eq!({
+            let mut buf = String::with_capacity(1 + usize::MAX.ilog10() as usize);
+            unsafe {encode_itoa_unchecked(n, buf.as_mut_vec())}
+            buf
+        }, n.to_string());
     }
 }
