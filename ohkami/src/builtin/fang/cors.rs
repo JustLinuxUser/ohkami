@@ -152,14 +152,14 @@ impl<Inner: FangProc> FangProc for CORSProc<Inner> {
             if let Some(allow_headers) = self.cors.AllowHeaders.as_deref()
                 .or_else(|| req.headers.AccessControlRequestHeaders())
             {
-                h = h.AccessControlAllowHeaders(allow_headers.to_string())
+                h.AccessControlAllowHeaders(allow_headers.to_string())
                     .Vary(append("Access-Control-Request-Headers"));
             }
 
             /* override default `Not Implemented` response for valid preflight */
             if res.status == Status::NotImplemented {
                 res.status = Status::OK;
-                h.ContentType(None).ContentLength(None);
+                res.drop_content();
             }
         }
 

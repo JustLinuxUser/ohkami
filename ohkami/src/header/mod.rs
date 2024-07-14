@@ -9,6 +9,3 @@ pub(crate) use setcookie::*;
 
 mod map;
 pub(crate) use map::IndexMap;
-
-mod value;
-pub(crate) use value::Value;

@@ -2,7 +2,6 @@
 
 use super::router::{TrieRouter, RouteSections};
 use crate::fangs::{Handler, IntoHandler};
-use crate::response::Content;
 use crate::Ohkami;
 
 
@@ -226,13 +225,6 @@ trait RoutingItem {
             struct StaticFileHandler {
                 mime:     &'static str,
                 content:  Vec<u8>,
-
-                /// Used for `Content-Length` header.
-                /// 
-                /// The size itself can be got by `.content.len()`,
-                /// but in response, we have to write it in stringified form
-                /// every time. So we should the string here for performance.
-                size_str: String,
             } const _: () = {
                 impl StaticFileHandler {
                     fn new(path_sections: &[String], file: std::fs::File) -> Result<Self, String> {
@@ -257,9 +249,7 @@ trait RoutingItem {
                             return Err(format!("[.Dir] got `{filename}`: Ohkami doesn't support non UTF-8 text file"))
                         }
 
-                        let size_str = content.len().to_string();
-
-                        Ok(Self { mime, content, size_str })
+                        Ok(Self { mime, content })
                     }
                 }
                 
@@ -269,17 +259,7 @@ trait RoutingItem {
                             = Box::leak(Box::new(self));
 
                         Handler::new(|_| Box::pin(async {
-                            let mut res = crate::Response::OK();
-                            {
-                                res.headers.set()
-                                    .ContentType(this.mime)
-                                    .ContentLength(&*this.size_str);
-                                res.content = Content::Payload({
-                                    let content: &'static [u8] = &this.content;
-                                    content.into()
-                                });
-                            }
-                            res
+                            crate::Response::OK().with_payload(this.mime, &*this.content)
                         }))
                     }
                 }

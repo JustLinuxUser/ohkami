@@ -58,11 +58,14 @@ impl TestingOhkami {
             let mut request = Request::init();
             let mut request = unsafe {Pin::new_unchecked(&mut request)};
             
-            let res = match request.as_mut().read(&mut &req.encode()[..]).await {
+            let mut res = match request.as_mut().read(&mut &req.encode()[..]).await {
                 Ok(Some(())) => router.handle(&mut request).await,
                 Ok(None) => panic!("No request"),
                 Err(res) => res,
             };
+
+            res.complete();
+            assert_eq!(res.headers.Date(), Some(crate::utils::utc_datetime_now()));
 
             TestResponse::new(res)
         };
@@ -199,19 +202,29 @@ impl TestResponse {
     pub fn text(&self) -> Option<&str> {
         if self.0.headers.ContentType()?.starts_with("text/plain") {
             let body = self.0.content.as_bytes()?;
+            assert_eq!(self.0.headers.ContentLength(), Some(body.len()));
             Some(std::str::from_utf8(body).expect(&f!("Response content is not UTF-8: {}", body.escape_ascii())))
         } else {None}
     }
     pub fn html(&self) -> Option<&str> {
         if self.0.headers.ContentType()?.starts_with("text/html") {
             let body = self.0.content.as_bytes()?;
+            assert_eq!(self.0.headers.ContentLength(), Some(body.len()));
             Some(std::str::from_utf8(body).expect(&f!("Response content is not UTF-8: {}", body.escape_ascii())))
         } else {None}
     }
     pub fn json<'d, JSON: serde::Deserialize<'d>>(&'d self) -> Option<serde_json::Result<JSON>> {
         if self.0.headers.ContentType()?.starts_with("application/json") {
             let body = self.0.content.as_bytes()?;
+            assert_eq!(self.0.headers.ContentLength(), Some(body.len()));
             Some(serde_json::from_slice(body))
+        } else {None}
+    }
+    pub fn payload(&self, mime: &'static str) -> Option<&[u8]> {
+        if self.0.headers.ContentType()?.starts_with(mime) {
+            let body = self.0.content.as_bytes()?;
+            assert_eq!(self.0.headers.ContentLength(), Some(body.len()));
+            Some(body)
         } else {None}
     }
 }

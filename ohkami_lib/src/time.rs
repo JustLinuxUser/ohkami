@@ -11,7 +11,7 @@ use std::time::Duration;
 }
 
 /// date time on UTC *to the second*
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UTCDateTime {
     date: Date,
     time: Time,
@@ -109,7 +109,7 @@ pub struct UTCDateTime {
 }
 
 /// (year << 13) | of
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Date(i32);
 impl Date {
     fn from_days(days: i32) -> Self {
@@ -187,7 +187,7 @@ impl Date {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Time {
     secs: u32,
 } impl Time {

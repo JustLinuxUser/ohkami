@@ -126,6 +126,10 @@ pub mod utils {
     macro_rules! push_unchecked {
         ($buf:ident <- $bytes:expr) => {
             {
+                #[cfg(debug_assertions)] {
+                    assert!($buf.capacity() - $buf.len() >= $bytes.len());
+                }
+
                 let (buf_len, bytes_len) = ($buf.len(), $bytes.len());
                 std::ptr::copy_nonoverlapping(
                     $bytes.as_ptr(),
@@ -163,6 +167,13 @@ pub mod utils {
     /// JavaScript `Date.now() / 1000` --as--> Rust `u64`
     #[inline] pub fn unix_timestamp() -> u64 {
         (worker::js_sys::Date::now() / 1000.) as _
+    }
+
+    #[inline]
+    pub(crate) fn utc_datetime_now() -> ohkami_lib::time::UTCDateTime {
+        ohkami_lib::time::UTCDateTime::from_duration_since_unix_epoch(
+            std::time::Duration::from_secs(unix_timestamp())
+        )
     }
 
     pub struct ErrorMessage(pub String);

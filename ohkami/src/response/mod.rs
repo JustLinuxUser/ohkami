@@ -123,27 +123,37 @@ impl Response {
     /// Complete HTTP spec
     #[inline(always)]
     pub(crate) fn complete(&mut self) {
-        self.headers.set().Date(ohkami_lib::time::UTCDateTime::from_duration_since_unix_epoch(
-            std::time::Duration::from_secs(crate::utils::unix_timestamp())
-        ));
+        self.headers.set().Date(crate::utils::utc_datetime_now());
 
-        match &self.content {
-            Content::None => {
-                match self.status {
-                    Status::NoContent => self.headers.set()
-                        .ContentLength(None),
-                    _ => self.headers.set()
-                        .ContentLength("0")
-                }
+        #[cfg(debug_assertions)]
+        match self.status {
+            Status::NoContent => if
+                self.headers.ContentLength().is_some() ||
+                self.headers.ContentType().is_some() ||
+                !self.content.is_none()
+            {
+                (|res: &mut Response| {
+                    res.content.take();
+                    res.headers.set().ContentType(None).noContentLength();
+                })(self)
+            },
+
+            _ => match &self.content {
+                Content::None => if self.headers.ContentLength().is_none() {
+                    (|res: &mut Response| {res.headers.set().ContentLength(0);})(self)
+                },
+
+                Content::Payload(p) => {let len = p.len(); if self.headers.ContentLength() != Some(len) {
+                    (|res: &mut Response| {res.headers.set().ContentLength(len);})(self)
+                }},
+
+                #[cfg(feature="sse")]
+                Content::Stream(_) => if self.headers.ContentLength().is_some() {
+                    (|res: &mut Response| {res.headers.set().noContentLength();})(self);
+                },                
             }
 
-            Content::Payload(bytes) => self.headers.set()
-                .ContentLength(bytes.len()),
-
-            #[cfg(feature="sse")]
-            Content::Stream(_) => self.headers.set()
-                .ContentLength(None)
-        };
+        }
     }
 }
 
@@ -160,9 +170,9 @@ impl Response {
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    self.headers.write_unchecked_to(&mut buf);
+                    self.headers.write_unchecked(&mut buf);
                 }
-        
+
                 conn.write_all(&buf).await.expect("Failed to send response");
             }
 
@@ -173,7 +183,7 @@ impl Response {
                     bytes.len()
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    self.headers.write_unchecked_to(&mut buf);
+                    self.headers.write_unchecked(&mut buf);
                     crate::push_unchecked!(buf <- bytes);
                 }
 
@@ -187,7 +197,7 @@ impl Response {
                     self.headers.size
                 ); unsafe {
                     crate::push_unchecked!(buf <- self.status.line());
-                    self.headers.write_unchecked_to(&mut buf);
+                    self.headers.write_unchecked(&mut buf);
                 }
         
                 conn.write_all(&buf).await.expect("Failed to send response");
@@ -239,11 +249,14 @@ impl Response {
         self
     }
 
+    #[inline]
     pub fn drop_content(&mut self) -> Content {
         let old_content = self.content.take();
-        self.headers.set()
-            .ContentType(None)
-            .ContentLength(None);
+        self.headers.set().ContentType(None);
+        match self.status {
+            Status::NoContent => self.headers.set().noContentLength(),
+            _                 => self.headers.set().ContentLength(0),
+        };
         old_content
     }
     pub fn without_content(mut self) -> Self {
@@ -255,10 +268,8 @@ impl Response {
         content_type: &'static str,
         content:      impl Into<Cow<'static, [u8]>>,
     ) {
-        let content = content.into();
-        self.headers.set()
-            .ContentType(content_type)
-            .ContentLength(content.len().to_string());
+        let content: Cow<'static, [u8]> = content.into();
+        self.headers.set().ContentType(content_type).ContentLength(content.len());
         self.content = Content::Payload(content.into());
     }
     pub fn with_payload(mut self,
@@ -275,8 +286,7 @@ impl Response {
     #[inline] pub fn set_text<Text: Into<Cow<'static, str>>>(&mut self, text: Text) {
         let body = text.into();
 
-        self.headers.set()
-            .ContentType("text/plain; charset=UTF-8");
+        self.headers.set().ContentType("text/plain; charset=UTF-8").ContentLength(body.len());
         self.content = Content::Payload(match body {
             Cow::Borrowed(str) => CowSlice::Ref(Slice::from_bytes(str.as_bytes())),
             Cow::Owned(string) => CowSlice::Own(string.into_bytes().into()),
@@ -291,8 +301,7 @@ impl Response {
     pub fn set_html<HTML: Into<Cow<'static, str>>>(&mut self, html: HTML) {
         let body = html.into();
 
-        self.headers.set()
-            .ContentType("text/html; charset=UTF-8");
+        self.headers.set().ContentType("text/html; charset=UTF-8").ContentLength(body.len());
         self.content = Content::Payload(match body {
             Cow::Borrowed(str) => CowSlice::Ref(Slice::from_bytes(str.as_bytes())),
             Cow::Owned(string) => CowSlice::Own(string.into_bytes().into()),
@@ -308,8 +317,7 @@ impl Response {
     pub fn set_json<JSON: serde::Serialize>(&mut self, json: JSON) {
         let body = ::serde_json::to_vec(&json).unwrap();
 
-        self.headers.set()
-            .ContentType("application/json");
+        self.headers.set().ContentType("application/json").ContentLength(body.len());
         self.content = Content::Payload(body.into());
     }
     #[inline(always)]
@@ -325,8 +333,7 @@ impl Response {
             Cow::Owned(string) => Cow::Owned(string.into_bytes()),
         };
 
-        self.headers.set()
-            .ContentType("application/json");
+        self.headers.set().ContentType("application/json").ContentLength(body.len());
         self.content = Content::Payload(body.into());
     }
     /// SAFETY: Argument `json_lit` is **valid JSON**
@@ -361,6 +368,7 @@ impl Response {
         ));
 
         self.headers.set()
+            .noContentLength()
             .ContentType("text/event-stream")
             .CacheControl("no-cache, must-revalidate")
             .TransferEncoding("chunked");

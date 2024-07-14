@@ -29,7 +29,6 @@ use ohkami_benches::response_headers::{
             .Vary(black_box("Origin"))
             .Server(black_box("ohkami"))
             .Connection(black_box("Keep-Alive"))
-            .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
             .Via(black_box("HTTP/1.1 GWA"))
             .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
             .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -53,7 +52,6 @@ use ohkami_benches::response_headers::{
             .Vary(black_box("Origin"))
             .Server(black_box("ohkami"))
             .Connection(black_box("Keep-Alive"))
-            .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
             .Via(black_box("HTTP/1.1 GWA"))
             .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
             .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -75,7 +73,6 @@ use ohkami_benches::response_headers::{
             .Vary(black_box("Origin"))
             .Server(black_box("ohkami"))
             .Connection(black_box("Keep-Alive"))
-            .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
             .Via(black_box("HTTP/1.1 GWA"))
             .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
             .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -98,7 +95,6 @@ use ohkami_benches::response_headers::{
             .Vary(black_box("Origin"))
             .Server(black_box("ohkami"))
             .Connection(black_box("Keep-Alive"))
-            .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
             .Via(black_box("HTTP/1.1 GWA"))
             .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
             .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -120,7 +116,6 @@ use ohkami_benches::response_headers::{
         h.insert(header::VARY, HeaderValue::from_static(black_box("Origin")));
         h.insert(header::SERVER, HeaderValue::from_static(black_box("ohkami")));
         h.insert(header::CONNECTION, HeaderValue::from_static(black_box("Keep-Alive")));
-        h.insert(header::DATE, HeaderValue::from_static(black_box("Wed, 21 Oct 2015 07:28:00 GMT")));
         h.insert(header::VIA, HeaderValue::from_static(black_box("HTTP/1.1 GWA")));
         h.insert(header::ALT_SVC, HeaderValue::from_static(black_box("h2=\":433\"; ma=2592000;")));
         h.insert(header::PROXY_AUTHENTICATE, HeaderValue::from_static(black_box("Basic realm=\"Access to the internal site\"")));
@@ -143,7 +138,6 @@ use ohkami_benches::response_headers::{
             .insert("Vary", black_box("Origin"))
             .insert("Server", black_box("ohkami"))
             .insert("Connection", black_box("Keep-Alive"))
-            .insert("Date", black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
             .insert("Alt-Svc", black_box("h2=\":433\"; ma=2592000"))
             .insert("Proxy-Authenticate", black_box("Basic realm=\"Access to the internal site\""))
             .insert("Referer-Policy", black_box("same-origin"))
@@ -166,7 +160,6 @@ use ohkami_benches::response_headers::{
             .Vary(black_box("Origin"))
             .Server(black_box("ohkami"))
             .Connection(black_box("Keep-Alive"))
-            .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
             .AltSvc(black_box("h2=\":433\"; ma=2592000"))
             .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
             .ReferrerPolicy(black_box("same-origin"))
@@ -189,7 +182,6 @@ use ohkami_benches::response_headers::{
             .insert_standard_from_reqbytes(StandardHeader::Vary, black_box(b"Origin"))
             .insert_standard_from_reqbytes(StandardHeader::Server, black_box(b"ohkami"))
             .insert_standard_from_reqbytes(StandardHeader::Connection, black_box(b"Keep-Alive"))
-            .insert_standard_from_reqbytes(StandardHeader::Date, black_box(b"Wed, 21 Oct 2015 07:28:00 GMT"))
             .insert_standard_from_reqbytes(StandardHeader::AltSvc, black_box(b"h2=\":433\"; ma=2592000"))
             .insert_standard_from_reqbytes(StandardHeader::ProxyAuthenticate, black_box(b"Basic realm=\"Access to the internal site\""))
             .insert_standard_from_reqbytes(StandardHeader::ReferrerPolicy, black_box(b"same-origin"))
@@ -214,7 +206,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .Via(black_box("HTTP/1.1 GWA"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -234,7 +225,6 @@ use ohkami_benches::response_headers::{
             .Vary(None)
             .Server(None)
             .Connection(None)
-            .Date(None)
             .Via(None)
             .AltSvc(None)
             .ProxyAuthenticate(None)
@@ -257,7 +247,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .Via(black_box("HTTP/1.1 GWA"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -277,7 +266,6 @@ use ohkami_benches::response_headers::{
             .Vary(black_box(None))
             .Server(black_box(None))
             .Connection(black_box(None))
-            .Date(black_box(None))
             .Via(black_box(None))
             .AltSvc(black_box(None))
             .ProxyAuthenticate(black_box(None))
@@ -300,7 +288,6 @@ use ohkami_benches::response_headers::{
     h.insert(header::VARY, HeaderValue::from_static(black_box("Origin")));
     h.insert(header::SERVER, HeaderValue::from_static(black_box("ohkami")));
     h.insert(header::CONNECTION, HeaderValue::from_static(black_box("Keep-Alive")));
-    h.insert(header::DATE, HeaderValue::from_static(black_box("Wed, 21 Oct 2015 07:28:00 GMT")));
     h.insert(header::VIA, HeaderValue::from_static(black_box("HTTP/1.1 GWA")));
     h.insert(header::ALT_SVC, HeaderValue::from_static(black_box("h2=\":433\"; ma=2592000;")));
     h.insert(header::PROXY_AUTHENTICATE, HeaderValue::from_static(black_box("Basic realm=\"Access to the internal site\"")));
@@ -318,7 +305,6 @@ use ohkami_benches::response_headers::{
         h.remove(header::VARY);
         h.remove(header::SERVER);
         h.remove(header::CONNECTION);
-        h.remove(header::DATE);
         h.remove(header::VIA);
         h.remove(header::ALT_SVC);
         h.remove(header::PROXY_AUTHENTICATE);
@@ -340,7 +326,6 @@ use ohkami_benches::response_headers::{
         .insert("Vary", black_box("Origin"))
         .insert("Server", black_box("ohkami"))
         .insert("Connection", black_box("Keep-Alive"))
-        .insert("Date", black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .insert("Alt-Svc", black_box("h2=\":433\"; ma=2592000"))
         .insert("Proxy-Authenticate", black_box("Basic realm=\"Access to the internal site\""))
         .insert("Referer-Policy", black_box("same-origin"))
@@ -359,7 +344,6 @@ use ohkami_benches::response_headers::{
             .remove("Vary")
             .remove("Server")
             .remove("Connection")
-            .remove("Date")
             .remove("Alt-Svc")
             .remove("Proxy-Authenticate")
             .remove("Referer-Policy")
@@ -382,7 +366,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
         .ReferrerPolicy(black_box("same-origin"))
@@ -401,7 +384,6 @@ use ohkami_benches::response_headers::{
             .Vary(None)
             .Server(None)
             .Connection(None)
-            .Date(None)
             .Via(None)
             .AltSvc(None)
             .ProxyAuthenticate(None)
@@ -424,7 +406,6 @@ use ohkami_benches::response_headers::{
         .insert_standard_from_reqbytes(StandardHeader::Vary, black_box(b"Origin"))
         .insert_standard_from_reqbytes(StandardHeader::Server, black_box(b"ohkami"))
         .insert_standard_from_reqbytes(StandardHeader::Connection, black_box(b"Keep-Alive"))
-        .insert_standard_from_reqbytes(StandardHeader::Date, black_box(b"Wed, 21 Oct 2015 07:28:00 GMT"))
         .insert_standard_from_reqbytes(StandardHeader::AltSvc, black_box(b"h2=\":433\"; ma=2592000"))
         .insert_standard_from_reqbytes(StandardHeader::ProxyAuthenticate, black_box(b"Basic realm=\"Access to the internal site\""))
         .insert_standard_from_reqbytes(StandardHeader::ReferrerPolicy, black_box(b"same-origin"))
@@ -443,7 +424,6 @@ use ohkami_benches::response_headers::{
             .remove_standard(StandardHeader::Vary)
             .remove_standard(StandardHeader::Server)
             .remove_standard(StandardHeader::Connection)
-            .remove_standard(StandardHeader::Date)
             .remove_standard(StandardHeader::Via)
             .remove_standard(StandardHeader::AltSvc)
             .remove_standard(StandardHeader::ProxyAuthenticate)
@@ -468,7 +448,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .Via(black_box("HTTP/1.1 GWA"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -495,7 +474,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .Via(black_box("HTTP/1.1 GWA"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -521,7 +499,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .Via(black_box("HTTP/1.1 GWA"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -547,7 +524,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .Via(black_box("HTTP/1.1 GWA"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000;"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
@@ -574,7 +550,6 @@ use ohkami_benches::response_headers::{
     h.insert(header::VARY, HeaderValue::from_static(black_box("Origin")));
     h.insert(header::SERVER, HeaderValue::from_static(black_box("ohkami")));
     h.insert(header::CONNECTION, HeaderValue::from_static(black_box("Keep-Alive")));
-    h.insert(header::DATE, HeaderValue::from_static(black_box("Wed, 21 Oct 2015 07:28:00 GMT")));
     h.insert(header::VIA, HeaderValue::from_static(black_box("HTTP/1.1 GWA")));
     h.insert(header::ALT_SVC, HeaderValue::from_static(black_box("h2=\":433\"; ma=2592000;")));
     h.insert(header::PROXY_AUTHENTICATE, HeaderValue::from_static(black_box("Basic realm=\"Access to the internal site\"")));
@@ -606,7 +581,6 @@ use ohkami_benches::response_headers::{
         .insert("Vary", black_box("Origin"))
         .insert("Server", black_box("ohkami"))
         .insert("Connection", black_box("Keep-Alive"))
-        .insert("Date", black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .insert("Alt-Svc", black_box("h2=\":433\"; ma=2592000"))
         .insert("Proxy-Authenticate", black_box("Basic realm=\"Access to the internal site\""))
         .insert("Referer-Policy", black_box("same-origin"))
@@ -632,7 +606,6 @@ use ohkami_benches::response_headers::{
         .Vary(black_box("Origin"))
         .Server(black_box("ohkami"))
         .Connection(black_box("Keep-Alive"))
-        .Date(black_box("Wed, 21 Oct 2015 07:28:00 GMT"))
         .AltSvc(black_box("h2=\":433\"; ma=2592000"))
         .ProxyAuthenticate(black_box("Basic realm=\"Access to the internal site\""))
         .ReferrerPolicy(black_box("same-origin"))
@@ -658,7 +631,6 @@ use ohkami_benches::response_headers::{
         .insert_standard_from_reqbytes(StandardHeader::Vary, black_box(b"Origin"))
         .insert_standard_from_reqbytes(StandardHeader::Server, black_box(b"ohkami"))
         .insert_standard_from_reqbytes(StandardHeader::Connection, black_box(b"Keep-Alive"))
-        .insert_standard_from_reqbytes(StandardHeader::Date, black_box(b"Wed, 21 Oct 2015 07:28:00 GMT"))
         .insert_standard_from_reqbytes(StandardHeader::AltSvc, black_box(b"h2=\":433\"; ma=2592000"))
         .insert_standard_from_reqbytes(StandardHeader::ProxyAuthenticate, black_box(b"Basic realm=\"Access to the internal site\""))
         .insert_standard_from_reqbytes(StandardHeader::ReferrerPolicy, black_box(b"same-origin"))

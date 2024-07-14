@@ -53,6 +53,7 @@ impl Content {
         matches!(self, Self::None)
     }
 
+    #[inline]
     pub fn take(&mut self) -> Content {
         std::mem::take(self)
     }
