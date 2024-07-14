@@ -32,7 +32,7 @@ impl Value {
     }
 
     /// SAFETY: `Slice` variant has, if exists, UTF-8 bytes
-    #[inline(always)]
+    #[inline]
     pub unsafe fn as_str_unchecked(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(&*s),
@@ -45,10 +45,7 @@ impl Value {
     #[inline]
     pub unsafe fn append_unchecked(&mut self, another: Value) {
         let mut buf = match self {
-            Self::String(s) => return {
-                s.reserve(another.size());
-                unsafe {another.push_unchecked(s.as_mut_vec())}
-            },
+            Self::String(s) => std::mem::take(s),
             Self::Slice(s) => String::from_utf8_unchecked(Vec::from(&**s)),
             Self::Time(t) => t.to_imf_fixdate(),
             Self::Int(i) => num::itoa(*i),
