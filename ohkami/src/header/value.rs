@@ -24,21 +24,15 @@ impl Value {
     #[inline(always)]
     pub unsafe fn push_unchecked(&self, buf: &mut Vec<u8>) {
         match self {
-            Self::String(s) => {
-                std::ptr::copy_nonoverlapping(s.as_ptr(), buf.as_mut_ptr().add(buf.len()), s.len());
-                buf.set_len(buf.len() + s.len())
-            }
-            Self::Slice(s) => {
-                std::ptr::copy_nonoverlapping(s.as_ptr(), buf.as_mut_ptr().add(buf.len()), s.len());
-                buf.set_len(buf.len() + s.len())
-            }
+            Self::String(s) => crate::push_unchecked!(buf <- s),
+            Self::Slice(s) => crate::push_unchecked!(buf <- s),
             Self::Time(t) => t.fmt_imf_fixdate_unchecked(buf),
             Self::Int(i) => num::encode_itoa_unchecked(*i, buf),
         }
     }
 
-    #[inline(always)]
     /// SAFETY: `Slice` variant has, if exists, UTF-8 bytes
+    #[inline(always)]
     pub unsafe fn as_str_unchecked(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(&*s),
@@ -48,6 +42,7 @@ impl Value {
     }
 
     /// SAFETY: any `Slice` variants have, if exists, UTF-8 bytes
+    #[inline]
     pub unsafe fn append_unchecked(&mut self, another: Value) {
         let mut buf = match self {
             Self::String(s) => return {
@@ -63,6 +58,7 @@ impl Value {
         *self = Self::String(buf)
     }
 
+    #[inline]
     pub fn stringify(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Self::String(s) => s.into(),
@@ -89,7 +85,7 @@ impl From<&'static str> for Value {
     }
 }
 impl From<String> for Value {
-    #[inline]
+    #[inline(always)]
     fn from(s: String) -> Self {
         Self::String(s)
     }
