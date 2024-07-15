@@ -137,34 +137,6 @@ pub mod utils {
         };
     }
 
-    pub use crate::fangs::util::FangAction;
-
-    #[cfg(feature="sse")]
-    pub use ohkami_lib::stream::{self, Stream, StreamExt};
-
-    #[cfg(not(feature="rt_worker"))]
-    /// ```
-    /// # let _ =
-    /// {
-    ///     std::time::SystemTime::now()
-    ///         .duration_since(std::time::UNIX_EPOCH)
-    ///         .unwrap()
-    ///         .as_secs()
-    /// }
-    /// # ;
-    /// ```
-    #[inline] pub fn unix_timestamp() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-    }
-    #[cfg(feature="rt_worker")]
-    /// JavaScript `Date.now() / 1000` --as--> Rust `u64`
-    #[inline] pub fn unix_timestamp() -> u64 {
-        (worker::js_sys::Date::now() / 1000.) as _
-    }
-
     pub struct ErrorMessage(pub String);
     const _: () = {
         impl std::fmt::Debug for ErrorMessage {
@@ -184,6 +156,65 @@ pub mod utils {
             }
         }
     };
+
+    pub use crate::fangs::util::FangAction;
+
+    #[cfg(feature="sse")]
+    pub use ohkami_lib::stream::{self, Stream, StreamExt};
+
+    #[cfg(not(feature="rt_worker"))]
+    /// ```
+    /// # let _ =
+    /// {
+    ///     std::time::SystemTime::now()
+    ///         .duration_since(std::time::UNIX_EPOCH)
+    ///         .unwrap()
+    ///         .as_secs()
+    /// }
+    /// # ;
+    /// ```
+    #[inline] pub fn unix_timestamp() -> u64 {
+        use crate::__rt__::task;
+        use std::{thread, sync::OnceLock, cell::UnsafeCell, time::Duration};
+
+        static NOW: OnceLock<TimestampCell> = OnceLock::new();
+
+        struct TimestampCell(UnsafeCell<u64>);
+        unsafe impl Sync for TimestampCell {}
+
+        unsafe {*NOW.get_or_init(|| {
+            let init = {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+            };
+
+            let t = TimestampCell(UnsafeCell::new(init));
+            task::spawn_blocking(|| loop {
+                thread::sleep(Duration::from_secs(1));
+
+                #[cfg(debug_assertions)] {
+                    assert!(NOW.get().is_some());
+                    assert!(NOW.get().unwrap().0.get().as_ref().is_some());
+                }
+
+                *NOW.get().unwrap_unchecked().0.get().as_mut().unwrap_unchecked() += 1;
+
+                #[cfg(feature="DEBUG")] {
+                    let now = unix_timestamp();
+                    let imf_fixdate = ohkami_lib::time::UTCDateTime::from_duration_since_unix_epoch(Duration::from_secs(now)).into_imf_fixdate();
+                    println!("unix_timestamp: {now} ({imf_fixdate})");
+                }
+            });
+            t
+        }).0.get()}
+    }
+    #[cfg(feature="rt_worker")]
+    /// JavaScript `Date.now() / 1000` --as--> Rust `u64`
+    #[inline] pub fn unix_timestamp() -> u64 {
+        (worker::js_sys::Date::now() / 1000.) as _
+    }
 }
 
 #[cfg(feature="rt_worker")]

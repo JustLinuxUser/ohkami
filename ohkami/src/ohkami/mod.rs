@@ -1,8 +1,6 @@
 #![cfg(any(feature="rt_tokio",feature="rt_async-std",feature="rt_worker"))]
 
-#[cfg(test)]
-mod _test;
-
+#[cfg(test)] mod _test;
 pub(crate) mod build;
 pub(crate) mod router;
 
@@ -271,6 +269,12 @@ impl Ohkami {
             Ok(listener) => listener,
             Err(e)       => panic!("Failed to bind TCP listener: {e}"),
         };
+
+        #[cfg(feature="DEBUG")] {
+            let now = crate::utils::unix_timestamp();
+            let imf_fixdate = ohkami_lib::imf_fixdate(std::time::Duration::from_secs(now));
+            println!("started at {now} ({imf_fixdate})", );
+        }
         
         #[cfg(feature="rt_tokio")] {
             loop {
