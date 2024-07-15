@@ -174,7 +174,6 @@ pub mod utils {
     /// # ;
     /// ```
     #[inline] pub fn unix_timestamp() -> u64 {
-        use crate::__rt__::task;
         use std::{thread, sync::OnceLock, cell::UnsafeCell, time::Duration};
 
         static NOW: OnceLock<TimestampCell> = OnceLock::new();
@@ -191,7 +190,7 @@ pub mod utils {
             };
 
             let t = TimestampCell(UnsafeCell::new(init));
-            task::spawn_blocking(|| loop {
+            crate::__rt__::task::spawn_blocking(|| loop {
                 thread::sleep(Duration::from_secs(1));
 
                 #[cfg(debug_assertions)] {
