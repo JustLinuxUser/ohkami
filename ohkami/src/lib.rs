@@ -190,7 +190,7 @@ pub mod utils {
             };
 
             let t = TimestampCell(UnsafeCell::new(init));
-            crate::__rt__::task::spawn_blocking(|| loop {
+            thread::spawn(|| loop {
                 thread::sleep(Duration::from_secs(1));
 
                 #[cfg(debug_assertions)] {
