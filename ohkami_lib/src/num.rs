@@ -74,6 +74,108 @@ pub fn itoa(mut n: usize) -> String {
     unsafe {String::from_utf8_unchecked(buf)}
 }
 
+/// SAFETY: `buf` has enough capacity for ascii expression of `n`
+#[inline]
+pub unsafe fn fmt_itoa_unchecked(n: usize, buf: &mut Vec<u8>) {
+    mod dec4le {
+        macro_rules! invariant {
+            ($expr: expr) => {
+                debug_assert!($expr);
+                if !($expr) {
+                    #[allow(unused_unsafe)]
+                    unsafe {
+                        core::hint::unreachable_unchecked()
+                    };
+                }
+            };
+        }
+        const D4: [u32; 10000] = {
+            let (mut d4, mut i) = ([0u32; 10000], 0u32);
+            while i < 10000 {
+                let (dh, dl) = (i / 100, i % 100);
+                d4[i as usize] = ((dl % 10) << 24) | ((dl / 10) << 16) | ((dh % 10) << 8) | (dh / 10) | 0x30303030;
+                i += 1;
+            }
+            d4
+        };
+        #[inline(always)]
+        unsafe fn raw_d4l(v: &mut *mut u8, x: u32) {
+            invariant!(x < 10000);
+            match x {
+                0..=9 => {
+                    **v = x as u8 | 0x30;
+                    *v = v.add(1);
+                }
+                10..=99 => {
+                    v.copy_from_nonoverlapping((D4[x as usize] >> 16).to_le_bytes().as_ptr(), 2);
+                    *v = v.add(2);
+                }
+                100..=999 => {
+                    v.copy_from_nonoverlapping((D4[x as usize] >> 8).to_le_bytes().as_ptr(), 3);
+                    *v = v.add(3);
+                }
+                1000..=9999 => {
+                    v.copy_from_nonoverlapping(D4[x as usize].to_le_bytes().as_ptr(), 4);
+                    *v = v.add(4);
+                }
+                _ => core::hint::unreachable_unchecked(),
+            }
+        }
+        #[inline(always)]
+        unsafe fn raw_d4(v: &mut *mut u8, x: u32) {
+            invariant!(x < 1_0000);
+            v.copy_from_nonoverlapping(D4[x as usize].to_le_bytes().as_ptr(), 4);
+            *v = v.add(4);
+        }
+        #[inline(always)]
+        unsafe fn raw_d8l(v: &mut *mut u8, x: u32) {
+            invariant!(x < 1_0000_0000);
+            if x < 10000 {
+                raw_d4l(v, x);
+            } else {
+                let (y0, y1) = (x / 1_0000, x % 1_0000);
+                raw_d4l(v, y0);
+                raw_d4(v, y1);
+            }
+        }
+        #[inline(always)]
+        unsafe fn raw_d8(v: &mut *mut u8, x: u32) {
+            invariant!(x < 1_0000_0000);
+            let (y0, y1) = (x / 1_0000, x % 1_0000);
+            v.copy_from_nonoverlapping((((D4[y1 as usize] as u64) << 32) | (D4[y0 as usize] as u64)).to_le_bytes().as_ptr(), 8);
+            *v = v.add(8);
+        }
+        #[inline(always)]
+        pub unsafe fn raw_u64(v: &mut *mut u8, x: u64) {
+            match x {
+                0..=9999_9999 => {
+                    raw_d8l(v, x as u32);
+                }
+                1_0000_0000..=9999_9999_9999_9999 => {
+                    let (z0, z1) = ((x / 1_0000_0000) as u32, (x % 1_0000_0000) as u32);
+                    raw_d8l(v, z0);
+                    raw_d8(v, z1);
+                }
+                1_0000_0000_0000_0000..=u64::MAX => {
+                    let (y0, y1) = (
+                        (x / 1_0000_0000_0000_0000) as u32,
+                        x % 1_0000_0000_0000_0000,
+                    );
+                    let (z0, z1) = ((y1 / 1_0000_0000) as u32, (y1 % 1_0000_0000) as u32);
+                    raw_d8l(v, y0);
+                    raw_d8(v, z0);
+                    raw_d8(v, z1);
+                }
+            }
+        }
+    }
+
+    let r = buf.as_mut_ptr();
+    let mut p = r.add(buf.len());
+    dec4le::raw_u64(&mut p, n as u64);
+    buf.set_len(p.offset_from(r) as usize);
+}
+
 #[cfg(test)]
 #[test] fn test_itoa() {
     for n in [

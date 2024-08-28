@@ -192,7 +192,7 @@ impl TestResponse {
             .and_then(|h| self.0.headers.get(h))
             .or_else(|| self.0.headers.get_custom(name))
     }
-    pub fn headers(&self) -> impl Iterator<Item = (&str, &str)> {
+    pub fn headers(&self) -> impl Iterator<Item = (&str, std::borrow::Cow<str>)> {
         self.0.headers.iter()
     }
 

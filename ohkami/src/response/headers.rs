@@ -1,12 +1,13 @@
-use crate::header::{IndexMap, Append, SetCookie, SetCookieBuilder};
+use crate::header::{IndexMap, HeaderValue, Append, SetCookie, SetCookieBuilder};
 use std::borrow::Cow;
+use ohkami_lib::time::UTCDateTime;
 use rustc_hash::FxHashMap;
 
 
 #[derive(Clone)]
 pub struct Headers {
-    standard:  IndexMap<N_SERVER_HEADERS, Cow<'static, str>>,
-    custom:    Option<Box<FxHashMap<&'static str, Cow<'static, str>>>>,
+    standard:  IndexMap<N_SERVER_HEADERS, HeaderValue>,
+    custom:    Option<Box<FxHashMap<&'static str, HeaderValue>>>,
     setcookie: Option<Box<Vec<Cow<'static, str>>>>,
     pub(crate) size: usize,
 }
@@ -33,7 +34,7 @@ pub trait HeaderAction<'action> {
     // append
     impl<'a> HeaderAction<'a> for Append {
         #[inline] fn perform(self, set: SetHeaders<'a>, key: Header) -> SetHeaders<'a> {
-            set.0.append(key, self.0);
+            set.0.append(key, self.0.into());
             set
         }
     }
@@ -41,19 +42,31 @@ pub trait HeaderAction<'action> {
     // insert
     impl<'a> HeaderAction<'a> for &'static str {
         #[inline(always)] fn perform(self, set: SetHeaders<'a>, key: Header) -> SetHeaders<'a> {
-            set.0.insert(key, Cow::Borrowed(self));
+            set.0.insert(key, self.into());
             set
         }
     }
     impl<'a> HeaderAction<'a> for String {
         #[inline(always)] fn perform(self, set: SetHeaders<'a>, key: Header) -> SetHeaders<'a> {
-            set.0.insert(key, Cow::Owned(self));
+            set.0.insert(key, self.into());
             set
         }
     }
     impl<'a> HeaderAction<'a> for std::borrow::Cow<'static, str> {
         fn perform(self, set: SetHeaders<'a>, key: Header) -> SetHeaders<'a> {
-            set.0.insert(key, self);
+            set.0.insert(key, self.into());
+            set
+        }
+    }
+    impl<'a> HeaderAction<'a> for usize {
+        fn perform(self, set: SetHeaders<'a>, key: Header) -> SetHeaders<'a> {
+            set.0.insert(key, self.into());
+            set
+        }
+    }
+    impl<'a> HeaderAction<'a> for UTCDateTime {
+        fn perform(self, set: SetHeaders<'a>, key: Header) -> SetHeaders<'a> {
+            set.0.insert(key, self.into());
             set
         }
     }
@@ -74,7 +87,7 @@ pub trait CustomHeadersAction<'action> {
     /* append */
     impl<'set> CustomHeadersAction<'set> for Append {
         fn perform(self, set: SetHeaders<'set>, key: &'static str) -> SetHeaders<'set> {
-            set.0.append_custom(key, self.0);
+            set.0.append_custom(key, self.0.into());
             set
         }
     }
@@ -82,19 +95,19 @@ pub trait CustomHeadersAction<'action> {
     /* insert */
     impl<'set> CustomHeadersAction<'set> for &'static str {
         #[inline(always)] fn perform(self, set: SetHeaders<'set>, key: &'static str) -> SetHeaders<'set> {
-            set.0.insert_custom(key, Cow::Borrowed(self));
+            set.0.insert_custom(key, self.into());
             set
         }
     }
     impl<'set> CustomHeadersAction<'set> for String {
         #[inline(always)] fn perform(self, set: SetHeaders<'set>, key: &'static str) -> SetHeaders<'set> {
-            set.0.insert_custom(key, Cow::Owned(self));
+            set.0.insert_custom(key, self.into());
             set
         }
     }
     impl<'set> CustomHeadersAction<'set> for Cow<'static, str> {
         fn perform(self, set: SetHeaders<'set>, key: &'static str) -> SetHeaders<'set> {
-            set.0.insert_custom(key, self);
+            set.0.insert_custom(key, self.into());
             set
         }
     }
@@ -279,7 +292,7 @@ const _: () = {
 
 impl Headers {
     #[inline(always)]
-    pub(crate) fn insert(&mut self, name: Header, value: Cow<'static, str>) {
+    pub(crate) fn insert(&mut self, name: Header, value: HeaderValue) {
         let (name_len, value_len) = (name.len(), value.len());
         match unsafe {self.standard.get_mut(name as usize)} {
             None => {
@@ -293,7 +306,7 @@ impl Headers {
         }
     }
     #[inline]
-    pub(crate) fn insert_custom(&mut self, name: &'static str, value: Cow<'static, str>) {
+    pub(crate) fn insert_custom(&mut self, name: &'static str, value: HeaderValue) {
         let self_len = value.len();
         match &mut self.custom {
             None => {
@@ -328,34 +341,23 @@ impl Headers {
 
     #[inline(always)]
     pub(crate) fn get(&self, name: Header) -> Option<&str> {
-        unsafe {self.standard.get(name as usize)}.map(Cow::as_ref)
+        unsafe {self.standard.get(name as usize)}.map(HeaderValue::as_str)
     }
     #[inline]
     pub(crate) fn get_custom(&self, name: &'static str) -> Option<&str> {
         self.custom.as_ref()?
             .get(name)
-            .map(Cow::as_ref)
+            .map(HeaderValue::as_str)
     }
 
-    pub(crate) fn append(&mut self, name: Header, value: Cow<'static, str>) {
+    pub(crate) fn append(&mut self, name: Header, value: HeaderValue) {
         let value_len = value.len();
         let target = unsafe {self.standard.get_mut(name as usize)};
 
         self.size += match target {
             Some(v) => {
-                match v {
-                    Cow::Borrowed(slice) => {
-                        let mut appended = String::with_capacity(slice.len() + 2 + value_len);
-                        appended.push_str(slice);
-                        appended.push_str(", ");
-                        appended.push_str(&value);
-                        *v = Cow::Owned(appended);
-                    }
-                    Cow::Owned(string) => {
-                        string.push_str(", ");
-                        string.push_str(&value);
-                    }
-                }
+                v.append(HeaderValue::Slice(","));
+                v.append(value);
                 ", ".len() + value_len
             }
             None => {
@@ -364,7 +366,7 @@ impl Headers {
             }
         };
     }
-    pub(crate) fn append_custom(&mut self, name: &'static str, value: Cow<'static, str>) {
+    pub(crate) fn append_custom(&mut self, name: &'static str, value: HeaderValue) {
         let value_len = value.len();
 
         let custom = {
@@ -376,18 +378,8 @@ impl Headers {
 
         self.size += match custom.get_mut(name) {
             Some(v) => {
-                match v {
-                    Cow::Owned(string) => {
-                        string.push_str(", ");
-                        string.push_str(&value);
-                    }
-                    Cow::Borrowed(s) => {
-                        let mut s = s.to_string();
-                        s.push_str(", ");
-                        s.push_str(&value);
-                        *v = Cow::Owned(s);
-                    }
-                }
+                v.append(HeaderValue::Slice(","));
+                v.append(value);
                 ", ".len() + value_len
             }
             None => {
@@ -412,24 +404,24 @@ impl Headers {
     #[doc(hidden)]
     pub fn _new() -> Self {Self::new()}
 
-    pub(crate) fn iter_standard(&self) -> impl Iterator<Item = (&str, &str)> {
+    pub(crate) fn iter_standard(&self) -> impl Iterator<Item = (&str, Cow<str>)> {
         self.standard.iter()
             .map(|(i, v)| (
                 unsafe {std::mem::transmute::<_, Header>(*i as u8)}.as_str(),
-                &**v
+                v.as_cow_str()
             ))
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, Cow<str>)> {
         self.iter_standard()
             .chain(self.custom.as_ref()
                 .into_iter()
-                .flat_map(|hm| hm.iter().map(|(k, v)| (*k, &**v)))
+                .flat_map(|hm| hm.iter().map(|(k, v)| (*k, v.as_cow_str())))
             )
             .chain(self.setcookie.as_ref()
                 .map(|sc| sc.iter().map(Cow::as_ref)).into_iter()
                 .flatten()
-                .map(|sc| ("Set-Cookie", sc))
+                .map(|sc| ("Set-Cookie", Cow::Borrowed(sc)))
             )
     }
 
@@ -443,7 +435,7 @@ impl Headers {
             let h = std::mem::transmute::<_, Header>(*i as u8); {
                 crate::push_unchecked!(buf <- h.as_bytes());
                 crate::push_unchecked!(buf <- b": ");
-                crate::push_unchecked!(buf <- v.as_bytes());
+                v.write_unchecked_to(buf);
                 crate::push_unchecked!(buf <- b"\r\n");
             }
         }
@@ -451,7 +443,7 @@ impl Headers {
             for (k, v) in &**custom {
                 crate::push_unchecked!(buf <- k.as_bytes());
                 crate::push_unchecked!(buf <- b": ");
-                crate::push_unchecked!(buf <- v.as_bytes());
+                v.write_unchecked_to(buf);
                 crate::push_unchecked!(buf <- b"\r\n");
             }
         }
@@ -484,7 +476,7 @@ const _: () = {
     impl PartialEq for Headers {
         fn eq(&self, other: &Self) -> bool {
             for (k, v) in self.iter_standard() {
-                if other.get(Header::from_bytes(k.as_bytes()).unwrap()) != Some(v) {
+                if other.get(Header::from_bytes(k.as_bytes()).unwrap()) != Some(&v) {
                     return false
                 }
             }
@@ -500,12 +492,12 @@ const _: () = {
     impl Headers {
         pub fn from_iter(iter: impl IntoIterator<Item = (
             &'static str,
-            impl Into<Cow<'static, str>>)>
-        ) -> Self {
+            impl Into<Cow<'static, str>>
+        )>) -> Self {
             let mut this = Headers::new();
             for (k, v) in iter {
                 match Header::from_bytes(k.as_bytes()) {
-                    Some(h) => this.insert(h, v.into()),
+                    Some(h) => this.insert(h, v.into().into()),
                     None    => {this.set().custom(k, v.into());}
                 }
             }
