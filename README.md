@@ -6,7 +6,10 @@
 <br>
 
 - *macro-less and type-safe* APIs for intuitive and declarative code
-- *multiple runtimes* are supported：`tokio`, `async-std`, `smol`, `glommio`, `worker` (Cloudflare Workers)
+- *various runtimes* are supported：
+  - `tokio`, `async-std`, `smol`, `glommio`
+  - `worker` ( Cloudflare Workers )
+  - `lambda` ( AWS Lambda )
 
 <div align="right">
     <a href="https://github.com/ohkami-rs/ohkami/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/crates/l/ohkami.svg" /></a>
@@ -94,6 +97,10 @@ npm create cloudflare ./path/to/project -- --template https://github.com/ohkami-
 then your project directory has `wrangler.toml`, `package.json` and a Rust library crate. Local dev by `npm run dev` and deploy by `npm run deploy` !
 
 See README of the [template](https://github.com/ohkami-rs/ohkami-templates/tree/main/worker) for details.
+
+### `"rt_lambda"`：AWS Lambda
+
+not documented yet
 
 ### `"sse"`：Server-Sent Events
 

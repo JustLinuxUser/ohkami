@@ -100,13 +100,10 @@ pub(crate) const PAYLOAD_LIMIT: usize = 1 << 32;
 pub struct Request {
     #[cfg(feature="__rt_native__")]
     pub(super/* for test */) __buf__: Box<[u8; BUF_SIZE]>,
-
     #[cfg(feature="rt_worker")]
-    pub(super/* for test */) __url__: std::mem::MaybeUninit<::worker::Url>,
-    #[cfg(feature="rt_worker")]
-    env: std::mem::MaybeUninit<::worker::Env>,
-    #[cfg(feature="rt_worker")]
-    ctx: std::mem::MaybeUninit<::worker::Context>,
+    __buf__: std::mem::MaybeUninit<WorkerBuf>,
+    #[cfg(feature="rt_lambda")]
+    __buf__: std::mem::MaybeUninit<LambdaBuf>,
 
     /// HTTP method of this request
     /// 
@@ -171,6 +168,27 @@ pub struct Request {
     pub ip: std::net::IpAddr,
 }
 
+#[cfg(feature="rt_worker")]
+struct WorkerBuf {
+    url: ::worker::Url,
+    env: ::worker::Env,
+    ctx: ::worker::Context,
+}
+
+#[cfg(feature="rt_lambda")]
+struct LambdaBuf {
+    path:    std::mem::MaybeUninit<Box<str>>,
+    query:   std::mem::MaybeUninit<Box<str>>,
+    headers: aws_lambda_events::http::HeaderMap,
+}
+#[cfg(feature="rt_lambda")]
+pub(crate) enum LambdaRequest {
+    ApiGatewayV1(aws_lambda_events::apigw::ApiGatewayProxyRequest),
+    ApiGatewayV2(aws_lambda_events::apigw::ApiGatewayV2httpRequest),
+    Alb(aws_lambda_events::alb::AlbTargetGroupRequest),
+    ApiGatewayWS(aws_lambda_events::apigw::ApiGatewayWebsocketProxyRequest),
+}
+
 impl Request {
     #[cfg(feature="__rt__")]
     #[inline]
@@ -179,16 +197,17 @@ impl Request {
         ip: std::net::IpAddr
     ) -> Self {
         Self {
-            #[cfg(feature="__rt_native__")]
-            __buf__: Box::new([0; BUF_SIZE]),
-
-            #[cfg(feature="rt_worker")]
-            __url__: std::mem::MaybeUninit::uninit(),
-            #[cfg(feature="rt_worker")]
-            env:     std::mem::MaybeUninit::uninit(),
-            #[cfg(feature="rt_worker")]
-            ctx:     std::mem::MaybeUninit::uninit(),
-
+            __buf__: {
+                #[cfg(feature="__rt_native__")] {
+                    Box::new([0; BUF_SIZE])
+                }
+                #[cfg(feature="rt_worker")] {
+                    std::mem::MaybeUninit::uninit()
+                }
+                #[cfg(feature="rt_lambda")] {
+                    std::mem::MaybeUninit::uninit()
+                }
+            },
             method:  Method::GET,
             path:    Path::uninit(),
             query:   None,
@@ -325,7 +344,7 @@ impl Request {
         }
     }
 
-    #[cfg(feature="rt_worker")]
+    #[cfg(not(feature="__rt_native__"))]
     #[cfg(feature="testing")]
     pub(crate) async fn read(mut self: Pin<&mut Self>,
         raw_bytes: &mut &[u8]
@@ -341,16 +360,18 @@ impl Request {
 
         r.next_if(|b| *b==b' ').ok_or_else(Response::BadRequest)?;
         
-        self.__url__.write({
-            let mut url = String::from("http://test.ohkami");
-            url.push_str(std::str::from_utf8(r.read_while(|b| b != &b' ')).unwrap());
-            ::worker::Url::parse(&url).unwrap()
-        });
-        // SAFETY: Just calling for request bytes and `self.__url__` is already initialized
-        unsafe {let __url__ = self.__url__.assume_init_ref();
-            let path = Slice::from_bytes(__url__.path().as_bytes()).as_bytes();
-            self.query = __url__.query().map(|str| QueryParams::new(str.as_bytes()));
-            self.path.init_with_request_bytes(path)?;
+        #[cfg(feature="rt_worker")] {
+            self.__url__.write({
+                let mut url = String::from("http://test.ohkami");
+                url.push_str(std::str::from_utf8(r.read_while(|b| b != &b' ')).unwrap());
+                ::worker::Url::parse(&url).unwrap()
+            });
+            // SAFETY: Just calling for request bytes and `self.__url__` is already initialized
+            unsafe {let __url__ = self.__url__.assume_init_ref();
+                let path = Slice::from_bytes(__url__.path().as_bytes()).as_bytes();
+                self.query = __url__.query().map(|str| QueryParams::new(str.as_bytes()));
+                self.path.init_with_request_bytes(path)?;
+            }
         }
 
         r.consume("HTTP/1.1\r\n").ok_or_else(Response::HTTPVersionNotSupported)?;
@@ -387,29 +408,87 @@ impl Request {
     ) -> Result<(), crate::Response> {use crate::Response;
         self.env.write(env);
         self.ctx.write(ctx);
-
+    
         self.method = Method::from_worker(req.method())
-            .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support `CONNECT`, `TRACE` method"))?;
-
+            .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support `CONNECT`, `TRACE` or custom method"))?;
+    
         self.__url__.write(req.url()
             .map_err(|_| Response::BadRequest().with_text("Invalid request URL"))?
         );
         #[cfg(feature="DEBUG")] worker::console_debug!("Load __url__: {:?}", self.__url__);
-
+    
         // SAFETY: Just calling for request bytes and `self.__url__` is already initialized
         unsafe {let __url__ = self.__url__.assume_init_ref();
             let path = Slice::from_bytes(__url__.path().as_bytes()).as_bytes();
             self.query = __url__.query().map(|str| QueryParams::new(str.as_bytes()));
             self.path.init_with_request_bytes(path)?;
         }
-
+    
         self.headers.take_over(req.headers());
-
+    
         self.payload = Some(CowSlice::Own(req.bytes().await
             .map_err(|_| Response::InternalServerError().with_text("Failed to read request payload"))?
             .into()
         ));
+    
+        Ok(())
+    }
 
+    #[cfg(feature="rt_lambda")]
+    pub(crate) async fn take_over(mut self: Pin<&mut Self>,
+        req: lambda_runtime::LambdaEvent<LambdaRequest>,
+    ) -> Result<(), crate::Response> {
+        use crate::Response;
+
+        let mut buf = LambdaBuf {
+            path:    std::mem::MaybeUninit::uninit(),
+            query:   std::mem::MaybeUninit::uninit(),
+            headers: aws_lambda_events::http::HeaderMap::new()
+        };
+
+        match &req.payload {
+            LambdaRequest::Alb(req) => {
+                {
+                    buf.path.write(req.path.unwrap_or_default().into_boxed_str());
+                    buf.query.write(req.query_string_parameters.to_query_string().into_boxed_str());
+                    buf.headers = {
+                        
+                    }
+                }
+
+                self.method = Method::from_lambda(req.http_method.clone())
+                    .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support `CONNECT`, `TRACE` or custom method"))?;
+
+                self.path.init_with_request_bytes(req.path.as_deref().unwrap_or("/").as_bytes())?;
+
+                req.multi_value_query_string_parameters.is_empty().then_some(())
+                    .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support multi-value query parameters"))?;
+                if !req.query_string_parameters.is_empty() {
+                    let query    = req.query_string_parameters.to_query_string().into_boxed_str();
+                    self.query   = Some(QueryParams::new(query.as_bytes()));
+                    query_string = Some(query);
+                }
+
+                // self.headers.take_over(&)
+
+                if
+                self.payload = 
+            }
+            LambdaRequest::ApiGatewayV1(req) => {
+
+            }
+            LambdaRequest::ApiGatewayV2(req) => {
+
+            }
+            LambdaRequest::ApiGatewayWS(req) => {
+
+            }
+        }
+
+        ////////////////////////////////
+        self.__buf__.write(buf);
+        ////////////////////////////////
+        
         Ok(())
     }
 }

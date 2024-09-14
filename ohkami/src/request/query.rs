@@ -46,9 +46,9 @@ impl QueryParams {
     }
 }
 
-#[cfg(feature="__rt_native__")]
 #[cfg(test)]
 const _: () = {
+    #[cfg(feature="__rt_native__")]
     impl<const N: usize> From<[(&'static str, &'static str); N]> for QueryParams {
         fn from(kvs: [(&'static str, &'static str); N]) -> Self {
             use ohkami_lib::percent_encode;

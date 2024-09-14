@@ -22,8 +22,10 @@ impl Method {
             _ => None
         }
     }
+
     #[cfg(feature="rt_worker")]
-    #[inline(always)] pub(crate) const fn from_worker(w: ::worker::Method) -> Option<Self> {
+    #[inline(always)]
+    pub(crate) const fn from_worker(w: ::worker::Method) -> Option<Self> {
         match w {
             ::worker::Method::Get     => Some(Self::GET),
             ::worker::Method::Put     => Some(Self::PUT),
@@ -32,6 +34,21 @@ impl Method {
             ::worker::Method::Delete  => Some(Self::DELETE),
             ::worker::Method::Head    => Some(Self::HEAD),
             ::worker::Method::Options => Some(Self::OPTIONS),
+            _ => None
+        }
+    }
+
+    #[cfg(feature="rt_lambda")]
+    #[inline(always)]
+    pub(crate) fn from_lambda(l: ::aws_lambda_events::http::Method) -> Option<Self> {
+        match l {
+            ::aws_lambda_events::http::Method::GET     => Some(Self::GET),
+            ::aws_lambda_events::http::Method::PUT     => Some(Self::PUT),
+            ::aws_lambda_events::http::Method::POST    => Some(Self::POST),
+            ::aws_lambda_events::http::Method::PATCH   => Some(Self::PATCH),
+            ::aws_lambda_events::http::Method::DELETE  => Some(Self::DELETE),
+            ::aws_lambda_events::http::Method::HEAD    => Some(Self::HEAD),
+            ::aws_lambda_events::http::Method::OPTIONS => Some(Self::OPTIONS),
             _ => None
         }
     }
