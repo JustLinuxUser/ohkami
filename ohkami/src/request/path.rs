@@ -11,11 +11,9 @@ pub(crate) struct PathInner {
 }
 struct Params {
     next: usize,
-    list: [MaybeUninit<Slice>; Self::LIMIT]
+    list: [MaybeUninit<Slice>; PARAMS_LIMIT]
 }
-impl Params {
-    const LIMIT: usize = 2;
-}
+const PARAMS_LIMIT: usize = 2;
 
 const _: () = {
     impl Params {
@@ -79,13 +77,13 @@ const _: () = {
     impl Params {
         #[inline(always)]
         const fn init() -> Self {
-            Params { next: 0, list: [const {MaybeUninit::uninit()}; Params::LIMIT] }
+            Params { next: 0, list: [const {MaybeUninit::uninit()}; PARAMS_LIMIT] }
         }
         
         #[inline(always)]
         fn push(&mut self, param: Slice) {
             #[cfg(debug_assertions)] {
-                assert!(self.next < Self::LIMIT);
+                assert!(self.next < PARAMS_LIMIT);
             }
             unsafe {self.list
                 .get_unchecked_mut(self.next)

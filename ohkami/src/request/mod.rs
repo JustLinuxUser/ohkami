@@ -177,8 +177,8 @@ struct WorkerBuf {
 
 #[cfg(feature="rt_lambda")]
 struct LambdaBuf {
-    path:    std::mem::MaybeUninit<Box<str>>,
-    query:   std::mem::MaybeUninit<Box<str>>,
+    path:    Option<Box<str>>,
+    query:   Option<Box<str>>,
     headers: aws_lambda_events::http::HeaderMap,
 }
 #[cfg(feature="rt_lambda")]
@@ -441,38 +441,32 @@ impl Request {
         use crate::Response;
 
         let mut buf = LambdaBuf {
-            path:    std::mem::MaybeUninit::uninit(),
-            query:   std::mem::MaybeUninit::uninit(),
+            path:    None,
+            query:   None,
             headers: aws_lambda_events::http::HeaderMap::new()
         };
 
-        match &req.payload {
+        match req.payload {
             LambdaRequest::Alb(req) => {
                 {
-                    buf.path.write(req.path.unwrap_or_default().into_boxed_str());
-                    buf.query.write(req.query_string_parameters.to_query_string().into_boxed_str());
-                    buf.headers = {
-                        
-                    }
+                    buf.path = req.path.map(String::into_boxed_str);
+
+                    req.multi_value_query_string_parameters.is_empty().then_some(())
+                        .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support multi-value query parameters"))?;
+                    buf.query = (!req.query_string_parameters.is_empty()).then(
+                        || req.query_string_parameters.to_query_string().into_boxed_str()
+                    );
+
+                    buf.headers.extend(req.headers);
+                    buf.headers.extend(req.multi_value_headers);
                 }
 
                 self.method = Method::from_lambda(req.http_method.clone())
                     .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support `CONNECT`, `TRACE` or custom method"))?;
-
-                self.path.init_with_request_bytes(req.path.as_deref().unwrap_or("/").as_bytes())?;
-
-                req.multi_value_query_string_parameters.is_empty().then_some(())
-                    .ok_or_else(|| Response::NotImplemented().with_text("ohkami doesn't support multi-value query parameters"))?;
-                if !req.query_string_parameters.is_empty() {
-                    let query    = req.query_string_parameters.to_query_string().into_boxed_str();
-                    self.query   = Some(QueryParams::new(query.as_bytes()));
-                    query_string = Some(query);
-                }
-
-                // self.headers.take_over(&)
-
-                if
-                self.payload = 
+                self.path.init_with_request_bytes(buf.path.as_deref().unwrap_or("/").as_bytes())?;
+                self.query = buf.query.as_deref().map(|q| QueryParams::new(q.as_bytes()));
+                self.headers.take_over(&);
+                self.payload = req.body.map(|s| CowSlice::Own(s.into_bytes().into_boxed_slice()))
             }
             LambdaRequest::ApiGatewayV1(req) => {
 
